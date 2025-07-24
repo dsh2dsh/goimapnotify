@@ -66,7 +66,7 @@
         {
           default = pkgs.buildGoModule {
             pname = "goimapnotify";
-            version = "2.5.1";
+            version = "2.5.3";
 
             src = builtins.path {
               path = ./.;
@@ -75,6 +75,12 @@
 
             modSha256 = "sha256-5cZzaCoOR1R7iST0q3GaJbYIbKKEigeWqhp87maOL04=";
             vendorHash = "sha256-5cZzaCoOR1R7iST0q3GaJbYIbKKEigeWqhp87maOL04=";
+
+            postPatch = ''
+              for f in command.go command_test.go; do
+                substituteInPlace $f --replace '"sh"' '"${pkgs.bash}/bin/sh"'
+              done
+            '';
 
             meta = with pkgs.lib; {
               description = "Execute scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE, golang version";
