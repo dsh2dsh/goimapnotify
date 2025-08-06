@@ -101,6 +101,12 @@ You can also use xoAuth2 instead of password based authentication by setting the
 
 As you can notice, `-list` can help you figure out the mailbox hierarchy of your mail server.
 
+# Contributors (According to GitHub)
+
+<a href="https://github.com/shackra/goimapnotify/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=shackra/goimapnotify&anon=1&columns=3" />
+</a>
+
 # Development
 nix-flake is use for development, is great and [you should try it](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#the-determinate-nix-installer) too! Activate support for flake in your nix installation and the environment will setup ✨*automagically*✨ for you.
 
