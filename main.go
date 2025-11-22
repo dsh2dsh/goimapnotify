@@ -60,19 +60,23 @@ func main() {
 			getDefaultConfigPath(),
 			fmt.Sprintf("goimapnotify.%s", viper.SupportedExts[2]),
 		),
-		"Configuration file",
+		"Configuration file, supported formats: json, yaml/yml, toml",
 	)
 	list := flag.Bool("list", false, "List all mailboxes and exit")
 	loglevel := flag.String(
 		"log-level",
 		"info",
-		"change the logging level, possible values: error, warning/warn, info/information, debug",
+		"Change the logging level; possible values are: error, warn, info, debug",
 	)
-	wait := flag.Int("wait", 1, "Period in seconds between IDLE event and execution of scripts")
+	wait := flag.Int(
+		"wait",
+		1,
+		"Delay in seconds between the IDLE event and the execution of the scripts",
+	)
 	dialRetries := flag.Int(
 		"dial-retry-attempts",
 		5,
-		"Number of attempts when dialing to an IMAP server, using exponential backoff",
+		"Number of attempts when connecting to an IMAP server, using exponential backoff",
 	)
 
 	flag.Usage = usage

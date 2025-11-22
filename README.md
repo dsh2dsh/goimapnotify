@@ -91,15 +91,15 @@ You can also use xoAuth2 instead of password based authentication by setting the
 
     Usage of goimapnotify:
       -conf string
-        	Configuration file (default "${HOME}/.config/goimapnotify/goimapnotify.yaml")
+            Configuration file, supported formats: json, yaml/yml, toml (default "$XDG_CONFIG_HOME/goimapnotify/goimapnotify.yaml")
       -dial-retry-attempts int
-        	Number of attempts when dialing to an IMAP server, using exponential backoff  (default 5)
+            Number of attempts when connecting to an IMAP server, using exponential backoff (default 5)
       -list
-        	List all mailboxes and exit
+            List all mailboxes and exit
       -log-level string
-        	change the logging level, possible values: error, warning/warn, info/information, debug (default "info")
+            Change the logging level; possible values are: error, warn, info, debug (default "info")
       -wait int
-        	Period in seconds between IDLE event and execution of scripts (default 1)
+            Delay in seconds between the IDLE event and the execution of the scripts (default 1)
 
 As you can notice, `-list` can help you figure out the mailbox hierarchy of your mail server.
 
