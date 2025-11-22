@@ -38,15 +38,27 @@ type IMAPIDLEClient struct {
 	*idle.IdleClient
 }
 
-func newClient(conf NotifyConfig) (c *client.Client, err error) {
-	if conf.TLS && !conf.TLSOptions.STARTTLS {
-		c, err = client.DialTLS(conf.Host+fmt.Sprintf(":%d", conf.Port), &tls.Config{
-			ServerName:         conf.Host,
-			InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
-			MinVersion:         tls.VersionTLS12,
-		})
-	} else {
-		c, err = client.Dial(conf.Host + fmt.Sprintf(":%d", conf.Port))
+func newClient(conf NotifyConfig, retries int) (c *client.Client, err error) {
+	server := fmt.Sprintf("%s:%d", conf.Host, conf.Port)
+
+	for wait := 1; wait <= retries; wait++ {
+		if conf.TLS && !conf.TLSOptions.STARTTLS {
+			c, err = client.DialTLS(server, &tls.Config{
+				ServerName:         conf.Host,
+				InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
+				MinVersion:         tls.VersionTLS12,
+			})
+		} else {
+			c, err = client.Dial(server)
+		}
+
+		if err == nil {
+			break
+		}
+
+		logrus.WithFields(logrus.Fields{"host": server, "tls": conf.TLS, "START TLS": conf.TLSOptions.STARTTLS, "error": err}).
+			Errorf("there was an error while dialing to host, waiting for %d second(s) to try again", wait)
+		time.Sleep(time.Second * time.Duration(wait))
 	}
 
 	if err != nil {
@@ -148,9 +160,9 @@ func newClient(conf NotifyConfig) (c *client.Client, err error) {
 	return c, err
 }
 
-func newIMAPIDLEClient(conf NotifyConfig) (c *IMAPIDLEClient, err error) {
+func newIMAPIDLEClient(conf NotifyConfig, retries int) (c *IMAPIDLEClient, err error) {
 	confCMDExecuted := retrieveCmd(conf)
-	i, err := newClient(confCMDExecuted)
+	i, err := newClient(confCMDExecuted, retries)
 	if err != nil {
 		return c, err
 	}

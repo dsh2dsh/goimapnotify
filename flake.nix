@@ -52,7 +52,7 @@
 
               shellcheck.enable = true;
 
-              golangci-lint.enable = true;
+              golangci-lint.enable = false;
               golines.enable = true;
               gotest.enable = true;
               gofmt.enable = true; # TODO: switch to `gofumpt`

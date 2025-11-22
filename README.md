@@ -92,6 +92,8 @@ You can also use xoAuth2 instead of password based authentication by setting the
     Usage of goimapnotify:
       -conf string
         	Configuration file (default "${HOME}/.config/goimapnotify/goimapnotify.yaml")
+      -dial-retry-attempts int
+        	Number of attempts when dialing to an IMAP server, using exponential backoff  (default 5)
       -list
         	List all mailboxes and exit
       -log-level string

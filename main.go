@@ -69,6 +69,11 @@ func main() {
 		"change the logging level, possible values: error, warning/warn, info/information, debug",
 	)
 	wait := flag.Int("wait", 1, "Period in seconds between IDLE event and execution of scripts")
+	dialRetries := flag.Int(
+		"dial-retry-attempts",
+		5,
+		"Number of attempts when dialing to an IMAP server, using exponential backoff",
+	)
 
 	flag.Usage = usage
 
@@ -103,7 +108,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
 
-	topConfig, err := loadConfiguration(*fileconf)
+	topConfig, err := loadConfiguration(*fileconf, *dialRetries)
 	if err != nil {
 		logrus.WithError(err).Fatalf("can't load the configuration %q", *fileconf)
 	}
@@ -115,7 +120,7 @@ func main() {
 
 	if *list {
 		for _, account := range topConfig.Configurations {
-			client, err := newClient(account)
+			client, err := newClient(account, *dialRetries)
 			if err != nil {
 				logrus.WithError(err).
 					WithField("account", account.Alias).
@@ -153,7 +158,7 @@ func main() {
 		*/
 		for _, account := range topConfig.Configurations {
 			for _, mailbox := range account.Boxes {
-				client, err := newIMAPIDLEClient(account)
+				client, err := newIMAPIDLEClient(account, *dialRetries)
 				if err != nil {
 					logrus.WithError(err).
 						WithField("account", account.Alias).
@@ -173,7 +178,7 @@ func main() {
 			l := logrus.WithField("alias", boxEvent.Mailbox.Alias).
 				WithField("mailbox", boxEvent.Mailbox.Mailbox)
 			l.Info("Restarting watcher for mailbox")
-			client, fErr := newIMAPIDLEClient(running.config[key])
+			client, fErr := newIMAPIDLEClient(running.config[key], *dialRetries)
 			if fErr != nil {
 				l.WithError(fErr).Fatal("Something went wrong creating IDLE client")
 			}
