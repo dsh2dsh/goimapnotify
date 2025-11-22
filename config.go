@@ -32,7 +32,7 @@ type EventType int
 const (
 	NEWMAIL EventType = iota + 1
 	DELETEDMAIL
-        FLAGCHANGED
+	FLAGCHANGED
 )
 
 func (e EventType) String() string {
@@ -166,7 +166,7 @@ func legacyConverter(conf ConfigurationLegacy) []NotifyConfig {
 	return append(r, c)
 }
 
-func loadConfiguration(path string) (*Configuration, error) {
+func loadConfiguration(path string, retries int) (*Configuration, error) {
 	var topConfiguration Configuration
 	if err := viper.Unmarshal(&topConfiguration); err != nil {
 		return nil, fmt.Errorf("can't parse the configuration: %q, error: %v", path, err)
@@ -209,7 +209,7 @@ func loadConfiguration(path string) (*Configuration, error) {
 
 		// If there is no mailboxes, watch over all mailboxes of the account
 		if len(conf.Boxes) == 0 {
-			client, err := newIMAPIDLEClient(conf)
+			client, err := newIMAPIDLEClient(conf, retries)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"account %q, failed to create IMAP client, error: %w",
