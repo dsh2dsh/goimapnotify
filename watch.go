@@ -94,23 +94,29 @@ func (w *WatchMailBox) Watch() {
 		case update := <-updates:
 			mu, ok := update.(*client.MailboxUpdate)
 			if ok {
-				// messages arrived
-				w.idleEvent <- IDLEEvent{
-					Alias:         w.box.Alias,
-					Mailbox:       w.box.Mailbox,
-					Reason:        NEWMAIL,
-					ExistingEmail: int(mu.Mailbox.Messages),
-					box:           w.box,
+				// if the server messages are greater than current no of messages in RAM
+				// only then take it as a new email otherwise ignore and update the current copy
+				// from the server.
+				if mu.Mailbox.Messages > w.box.ExistingEmail {
+					// messages arrived
+					w.idleEvent <- IDLEEvent{
+						Alias:         w.box.Alias,
+						Mailbox:       w.box.Mailbox,
+						Reason:        NEWMAIL,
+						ExistingEmail: int(mu.Mailbox.Messages),
+						box:           w.box,
+					}
 				}
+				w.box.ExistingEmail = mu.Mailbox.Messages
 			}
-			_ , ok = update.(*client.MessageUpdate)
+			_, ok = update.(*client.MessageUpdate)
 			if ok {
 				// messages flags updated
 				w.idleEvent <- IDLEEvent{
-					Alias:         w.box.Alias,
-					Mailbox:       w.box.Mailbox,
-					Reason:        FLAGCHANGED,
-					box:           w.box,
+					Alias:   w.box.Alias,
+					Mailbox: w.box.Mailbox,
+					Reason:  FLAGCHANGED,
+					box:     w.box,
 				}
 			}
 			_, ok = update.(*client.ExpungeUpdate)
