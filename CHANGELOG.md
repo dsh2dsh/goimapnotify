@@ -1,8 +1,16 @@
 <a name="unreleased"></a>
 ## [Unreleased]
 
+
+<a name="2.5.4"></a>
+## [2.5.4] - 2025-11-26
 ### Features
 - Add an option to launch synchronization when message flag changes
+
+### Fixes
+- Prevent new event from being created on message deletion
+- Improve explanation of cli options
+- Add cli option that allow users to set the amount of retries when dialing to a IMAP server
 
 
 <a name="2.5.3"></a>
@@ -126,7 +134,8 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.3...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.4...HEAD
+[2.5.4]: https://gitlab.com/shackra/goimapnotify/compare/2.5.3...2.5.4
 [2.5.3]: https://gitlab.com/shackra/goimapnotify/compare/2.5.2...2.5.3
 [2.5.2]: https://gitlab.com/shackra/goimapnotify/compare/2.5.1...2.5.2
 [2.5.1]: https://gitlab.com/shackra/goimapnotify/compare/2.5...2.5.1
