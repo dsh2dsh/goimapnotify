@@ -1,7 +1,7 @@
-package main
+package imap
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2019  Jorge Javier Araya Navarro
+// Copyright (C) 2017-2025  Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,14 +17,14 @@ package main
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"fmt"
-	"testing"
+	"errors"
 )
 
-func TestPasswordCMD(t *testing.T) {
-	password := "secret123"
-	c := retrievePasswordCmd(NotifyConfig{PasswordCMD: fmt.Sprintf("echo %s", password)})
-	if c.Password != password {
-		t.Fatalf("'%s' != '%s'", c.Password, password)
-	}
-}
+var (
+	ErrCannotCheckSupportedAuth = errors.New(
+		"there was an error while checking supported authentication mechanism",
+	)
+	ErrTokenAuthNotSupported = errors.New(
+		"XOAUTH2 and OAUTHBEARER are not supported by the server",
+	)
+)

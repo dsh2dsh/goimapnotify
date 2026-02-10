@@ -1,4 +1,4 @@
-package main
+package imap
 
 // The MIT License (MIT)
 //
@@ -25,13 +25,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/emersion/go-sasl"
 )
 
-// The XOAUTH2 mechanism name.
+// Xoauth2 is the XOAUTH2 mechanism name.
 const Xoauth2 = "XOAUTH2"
 
-// An XOAUTH2 error.
+// Xoauth2Error represents an XOAUTH2 error.
 type Xoauth2Error struct {
 	Status  string `json:"status"`
 	Schemes string `json:"schemes"`
@@ -64,7 +65,7 @@ func (a *xoauth2Client) Next(challenge []byte) ([]byte, error) {
 	}
 }
 
-// An implementation of the XOAUTH2 authentication mechanism, as
+// NewXoauth2Client creates an implementation of the XOAUTH2 authentication mechanism, as
 // described in https://developers.google.com/gmail/xoauth2_protocol.
 func NewXoauth2Client(username, token string) sasl.Client {
 	return &xoauth2Client{username, token}

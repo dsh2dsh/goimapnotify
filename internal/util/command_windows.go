@@ -1,7 +1,10 @@
-package main
+//go:build windows
+// +build windows
+
+package util
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2021  Jorge Javier Araya Navarro
+// Copyright (C) 2017-2025  Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,14 +21,17 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/sirupsen/logrus"
+
+	"gitlab.com/shackra/goimapnotify/internal/config"
 )
 
-// PrepareCommand parse a string and return a command executable by Go
-func PrepareCommand(command string, rsp IDLEEvent) *exec.Cmd {
+// PrepareCommand parses a string and returns a command executable by Go
+func PrepareCommand(command string, rsp config.IDLEEvent) *exec.Cmd {
 	var commandstr string
 	if strings.Contains(command, "%s") {
 		commandstr = fmt.Sprintf(command, rsp.Mailbox)

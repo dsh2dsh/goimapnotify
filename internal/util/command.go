@@ -1,4 +1,7 @@
-package main
+//go:build !windows
+// +build !windows
+
+package util
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025  Jorge Javier Araya Navarro
@@ -17,14 +20,30 @@ package main
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
+
+	"github.com/sirupsen/logrus"
+
+	"gitlab.com/shackra/goimapnotify/internal/config"
 )
 
-var (
-	ErrCannotCheckSupportedAuth = errors.New(
-		"there was an error while checking supported authentication mechanism",
-	)
-	ErrTokenAuthNotSupported = errors.New(
-		"XOAUTH2 and OAUTHBEARER are not supported by the server",
-	)
-)
+// PrepareCommand parses a string and returns a command executable by Go
+func PrepareCommand(command string, rsp config.IDLEEvent) *exec.Cmd {
+	var commandstr string
+	if strings.Contains(command, "%s") {
+		commandstr = fmt.Sprintf(command, rsp.Mailbox)
+	} else {
+		commandstr = command
+	}
+
+	commandsplt := append([]string{"sh", "-c"}, commandstr)
+	logrus.Debugf("Command: %s", strings.Join(commandsplt, " "))
+	// #nosec
+	cmd := exec.Command(commandsplt[0], commandsplt[1:]...)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+
+	return cmd
+}

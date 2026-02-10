@@ -1,4 +1,4 @@
-package main
+package runner
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025	Jorge Javier Araya Navarro
@@ -25,37 +25,44 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"gitlab.com/shackra/goimapnotify/internal/config"
+	"gitlab.com/shackra/goimapnotify/internal/imap"
+	"gitlab.com/shackra/goimapnotify/internal/util"
 )
 
+// RunningBox manages command scheduling and execution
 type RunningBox struct {
-	debug bool
-	wait  int
+	Debug bool
+	Wait  int
 	/*
 	 * Use map to create a different timer for each
 	 * username-mailbox combination
 	 */
 	timer  sync.Map
-	config map[string]NotifyConfig
+	Config map[string]config.NotifyConfig
 }
 
+// NewRunningBox creates a new RunningBox instance
 func NewRunningBox(debug bool, wait int) *RunningBox {
 	return &RunningBox{
-		debug:  debug,
-		wait:   wait,
+		Debug:  debug,
+		Wait:   wait,
 		timer:  sync.Map{},
-		config: make(map[string]NotifyConfig),
+		Config: make(map[string]config.NotifyConfig),
 	}
 }
 
-func (r *RunningBox) schedule(rsp IDLEEvent, done <-chan struct{}, queue chan IDLEEvent) {
+// Schedule debounces events before queueing them for execution
+func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue chan imap.IDLEEvent) {
 	l := logrus.WithField("alias", rsp.Alias).WithField("mailbox", rsp.Mailbox)
-	if shouldSkip(rsp.box) {
+	if ShouldSkip(rsp.Box) {
 		l.Warnf("No command for %q, skipping scheduling...", rsp.Reason)
 		return
 	}
 
 	key := rsp.Alias + rsp.Mailbox
-	wait := time.Duration(r.wait) * time.Second
+	wait := time.Duration(r.Wait) * time.Second
 	when := time.Now().Add(wait).Format(time.RFC850)
 	format := fmt.Sprintf("%%s syncing %q for %s (%s in the future)", rsp.Reason, when, wait)
 
@@ -88,25 +95,26 @@ func (r *RunningBox) schedule(rsp IDLEEvent, done <-chan struct{}, queue chan ID
 	}
 }
 
-func (r *RunningBox) run(rsp IDLEEvent) error {
+// Run executes commands based on the event type
+func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
 	l := logrus.WithField("alias", rsp.Alias).WithField("mailbox", rsp.Mailbox)
-	if r.debug {
+	if r.Debug {
 		l.Infoln("Running synchronization...")
 	}
 
 	switch rsp.Reason {
-	case NEWMAIL:
-		err := prepareAndRun(rsp.box.OnNewMail, rsp.box.OnNewMailPost, rsp)
+	case config.NEWMAIL:
+		err := prepareAndRun(rsp.Box.OnNewMail, rsp.Box.OnNewMailPost, rsp)
 		if err != nil {
 			return err
 		}
-	case FLAGCHANGED:
-		err := prepareAndRun(rsp.box.OnChangedMail, rsp.box.OnChangedMailPost, rsp)
+	case config.FLAGCHANGED:
+		err := prepareAndRun(rsp.Box.OnChangedMail, rsp.Box.OnChangedMailPost, rsp)
 		if err != nil {
 			return err
 		}
-	case DELETEDMAIL:
-		err := prepareAndRun(rsp.box.OnDeletedMail, rsp.box.OnDeletedMailPost, rsp)
+	case config.DELETEDMAIL:
+		err := prepareAndRun(rsp.Box.OnDeletedMail, rsp.Box.OnDeletedMailPost, rsp)
 		if err != nil {
 			return err
 		}
@@ -117,12 +125,12 @@ func (r *RunningBox) run(rsp IDLEEvent) error {
 	return nil
 }
 
-func prepareAndRun(on, onpost string, event IDLEEvent) error {
+func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 	callKind := "New"
-	if event.Reason == DELETEDMAIL {
+	if event.Reason == config.DELETEDMAIL {
 		callKind = "Deleted"
 	}
-	if event.Reason == FLAGCHANGED {
+	if event.Reason == config.FLAGCHANGED {
 		callKind = "Changed"
 	}
 
@@ -140,7 +148,12 @@ func prepareAndRun(on, onpost string, event IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call := PrepareCommand(bufOn.String(), event)
+	call := util.PrepareCommand(bufOn.String(), config.IDLEEvent{
+		Alias:   event.Alias,
+		Mailbox: event.Mailbox,
+		Reason:  event.Reason,
+		Box:     event.Box,
+	})
 	out, err := call.Output()
 	if err != nil {
 		exiterr, ok := err.(*exec.ExitError)
@@ -165,7 +178,12 @@ func prepareAndRun(on, onpost string, event IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call = PrepareCommand(bufOnPost.String(), event)
+	call = util.PrepareCommand(bufOnPost.String(), config.IDLEEvent{
+		Alias:   event.Alias,
+		Mailbox: event.Mailbox,
+		Reason:  event.Reason,
+		Box:     event.Box,
+	})
 	out, err = call.Output()
 	if err != nil {
 		exiterr, ok := err.(*exec.ExitError)
@@ -179,13 +197,14 @@ func prepareAndRun(on, onpost string, event IDLEEvent) error {
 	return nil
 }
 
-func shouldSkip(b Box) bool {
+// ShouldSkip checks if the event should be skipped based on the Box configuration
+func ShouldSkip(b config.Box) bool {
 	switch b.Reason {
-	case NEWMAIL:
+	case config.NEWMAIL:
 		return b.OnNewMail == "" || b.OnNewMail == "SKIP"
-	case FLAGCHANGED:
+	case config.FLAGCHANGED:
 		return b.OnChangedMail == "" || b.OnChangedMail == "SKIP"
-	case DELETEDMAIL:
+	case config.DELETEDMAIL:
 		return b.OnDeletedMail == "" || b.OnDeletedMail == "SKIP"
 	}
 

@@ -10,8 +10,26 @@ testing:
   stage: test
   script:
     - go vet ./...
-    - go build -v
-    - go test -coverprofile goimapnotify
+    - go build -v cmd/goimapnotify
+    # Run tests with coverage profile
+    - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    # Display coverage summary (used by GitLab coverage regex)
+    - go tool cover -func=coverage.out | tail -1
+    # Generate HTML coverage report
+    - go tool cover -html=coverage.out -o coverage.html
+    # Generate Cobertura XML for merge request coverage visualization
+    - go install github.com/boumenot/gocover-cobertura@latest
+    - gocover-cobertura < coverage.out > coverage.xml
+  coverage: '/total:\s+\(statements\)\s+(\d+(?:\.\d+)?%)/'
+  artifacts:
+    paths:
+      - coverage.out
+      - coverage.html
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    expire_in: 30 days
 
 merge_guard:
   stage: test

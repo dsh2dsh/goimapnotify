@@ -1,7 +1,7 @@
-package main
+package util
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2024  Jorge Javier Araya Navarro
+// Copyright (C) 2017-2025  Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,21 +22,31 @@ import (
 	"github.com/fatih/color"
 )
 
-func printDonate(out io.Writer, padding int) {
-	msg := donateMessage(padding)
+// PrintDonate prints the donation message to the given writer
+func PrintDonate(out io.Writer, padding int) {
+	msg := DonateMessage(padding)
 	white := color.New(color.FgWhite, color.Bold)
-	stars := white.Sprintf("%*s*****************************************************\n", padding, " ")
+	stars := white.Sprintf(
+		"%*s*****************************************************\n",
+		padding,
+		" ",
+	)
 
 	_, _ = out.Write([]byte(stars + msg + stars))
 }
 
-func donateMessage(padding int) string {
+// DonateMessage returns the formatted donation message
+func DonateMessage(padding int) string {
 	msg := ""
 	magenta := color.New(color.FgMagenta, color.Bold)
 	white := color.New(color.FgWhite, color.Bold)
 
 	// line
-	msg += white.Sprintf("%*s✨ If you like this project, consider making a donation \n", padding, " ")
+	msg += white.Sprintf(
+		"%*s✨ If you like this project, consider making a donation \n",
+		padding,
+		" ",
+	)
 	// line
 	msg += white.Sprintf("%*sto the author at ", padding, " ")
 	msg += magenta.Sprint("https://ko-fi.com/K3K1XEZCQ")
