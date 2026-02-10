@@ -1,4 +1,4 @@
-package main
+package util
 
 import (
 	"bufio"
@@ -13,11 +13,12 @@ var (
 	detectPasswordInLOGIN = regexp.MustCompile(`^(.*LOGIN\s+\S+\s+)"[^"]+"(.*)$`)
 )
 
-func censorCredentials(in io.Reader, out io.Writer) {
+// CensorCredentials pipes input to output while censoring sensitive information
+func CensorCredentials(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
 		line := scanner.Text()
-		censoredLine := censorEmailAddress(censorPasswordInLogin(line))
+		censoredLine := CensorEmailAddress(CensorPasswordInLogin(line))
 
 		_, err := out.Write([]byte(censoredLine + "\n"))
 		if err != nil {
@@ -26,7 +27,8 @@ func censorCredentials(in io.Reader, out io.Writer) {
 	}
 }
 
-func censorPasswordInLogin(in string) string {
+// CensorPasswordInLogin replaces password in LOGIN command
+func CensorPasswordInLogin(in string) string {
 	matches := detectPasswordInLOGIN.FindStringSubmatch(in)
 
 	if len(matches) == 0 {
@@ -36,7 +38,8 @@ func censorPasswordInLogin(in string) string {
 	return matches[1] + `"****"` + matches[2]
 }
 
-func censorEmailAddress(in string) string {
+// CensorEmailAddress replaces email addresses with asterisks
+func CensorEmailAddress(in string) string {
 	matches := emailRegexp.FindAllString(in, -1)
 
 	if len(matches) == 0 {

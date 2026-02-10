@@ -1,7 +1,7 @@
-package main
+package imap
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2024  Jorge Javier Araya Navarro
+// Copyright (C) 2017-2025  Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,33 +22,36 @@ import (
 
 	"github.com/emersion/go-imap/client"
 	"github.com/sirupsen/logrus"
+
+	"gitlab.com/shackra/goimapnotify/internal/config"
 )
 
 // IDLEEvent models an IDLE event
 type IDLEEvent struct {
 	Alias         string
 	Mailbox       string
-	Reason        EventType
+	Reason        config.EventType
 	ExistingEmail int
-	box           Box
+	Box           config.Box
 }
 
 // BoxEvent helps in communication between the box watch launcher and the box
 // watching goroutines
 type BoxEvent struct {
-	uniqID  string
-	Mailbox Box
+	UniqID  string
+	Mailbox config.Box
 }
 
-// WatchMailBox Keeps track of the IDLE state of one Mailbox
+// WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	client    *IMAPIDLEClient
-	box       Box
+	client    WatchClientInterface
+	box       config.Box
 	idleEvent chan<- IDLEEvent
 	boxEvent  chan<- BoxEvent
 	quit      <-chan struct{}
 }
 
+// Watch starts watching the mailbox for IDLE events
 func (w *WatchMailBox) Watch() {
 	updates := make(chan client.Update)
 	done := make(chan error, 1)
@@ -66,7 +69,7 @@ func (w *WatchMailBox) Watch() {
 	w.box.ExistingEmail = status.Messages
 	l.Debugf("existing mail: %d", w.box.ExistingEmail)
 
-	w.client.Updates = updates
+	w.client.SetUpdatesChannel(updates)
 
 	go func() {
 		l.Info("Watching mailbox")
@@ -79,9 +82,9 @@ func (w *WatchMailBox) Watch() {
 		w.idleEvent <- IDLEEvent{
 			Alias:         w.box.Alias,
 			Mailbox:       w.box.Mailbox,
-			Reason:        NEWMAIL,
+			Reason:        config.NEWMAIL,
 			ExistingEmail: 0,
-			box:           w.box,
+			Box:           w.box,
 		}
 	}()
 
@@ -102,9 +105,9 @@ func (w *WatchMailBox) Watch() {
 					w.idleEvent <- IDLEEvent{
 						Alias:         w.box.Alias,
 						Mailbox:       w.box.Mailbox,
-						Reason:        NEWMAIL,
+						Reason:        config.NEWMAIL,
 						ExistingEmail: int(mu.Mailbox.Messages),
-						box:           w.box,
+						Box:           w.box,
 					}
 				}
 				w.box.ExistingEmail = mu.Mailbox.Messages
@@ -115,8 +118,8 @@ func (w *WatchMailBox) Watch() {
 				w.idleEvent <- IDLEEvent{
 					Alias:   w.box.Alias,
 					Mailbox: w.box.Mailbox,
-					Reason:  FLAGCHANGED,
-					box:     w.box,
+					Reason:  config.FLAGCHANGED,
+					Box:     w.box,
 				}
 			}
 			_, ok = update.(*client.ExpungeUpdate)
@@ -125,8 +128,8 @@ func (w *WatchMailBox) Watch() {
 				w.idleEvent <- IDLEEvent{
 					Alias:   w.box.Alias,
 					Mailbox: w.box.Mailbox,
-					Reason:  DELETEDMAIL,
-					box:     w.box,
+					Reason:  config.DELETEDMAIL,
+					Box:     w.box,
 				}
 			}
 		case <-w.quit:
@@ -137,22 +140,36 @@ func (w *WatchMailBox) Watch() {
 			l.Warn("done watching mailbox")
 			if finished != nil {
 				l.WithError(finished).Info("watching stopped because of an error")
-				w.boxEvent <- BoxEvent{uniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
+				w.boxEvent <- BoxEvent{UniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
 			}
 			run = false
 		case <-kickedOut:
 			l.Info("connection to the server closed")
 			run = false
-			w.boxEvent <- BoxEvent{uniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
+			w.boxEvent <- BoxEvent{UniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
 		}
 	}
 }
 
-// NewWatchBox creates a new instance of WatchMailBox and launch it
+// NewWatchBox creates a new instance of WatchMailBox and launches it
 func NewWatchBox(
 	c *IMAPIDLEClient,
-	f NotifyConfig,
-	m Box,
+	f config.NotifyConfig,
+	m config.Box,
+	i chan<- IDLEEvent,
+	b chan<- BoxEvent,
+	q <-chan struct{},
+	wg *sync.WaitGroup,
+) {
+	NewWatchBoxWithClient(WrapIMAPIDLEClient(c), f, m, i, b, q, wg)
+}
+
+// NewWatchBoxWithClient creates a new instance of WatchMailBox with a custom client and launches it.
+// This function is useful for testing with mock clients.
+func NewWatchBoxWithClient(
+	c WatchClientInterface,
+	f config.NotifyConfig,
+	m config.Box,
 	i chan<- IDLEEvent,
 	b chan<- BoxEvent,
 	q <-chan struct{},

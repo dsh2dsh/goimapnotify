@@ -1,15 +1,4 @@
-package main
-
-import (
-	"bytes"
-	"fmt"
-	"slices"
-	"text/template"
-
-	"github.com/emersion/go-imap"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-)
+package config
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025	Jorge Javier Araya Navarro
@@ -27,6 +16,12 @@ import (
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import (
+	"bytes"
+	"text/template"
+)
+
+// EventType represents the type of IMAP event
 type EventType int
 
 const (
@@ -48,23 +43,7 @@ func (e EventType) String() string {
 	}
 }
 
-// compileTemplate tests that the string template is valid, if any was
-// provided.
-func compileTemplate(i string) error {
-	t, err := template.New("test").Parse(i)
-	if err != nil {
-		return err
-	}
-	buf := bytes.NewBuffer(nil)
-
-	input := IDLEEvent{
-		Alias:   "example@example.com",
-		Mailbox: "Inbox",
-	}
-
-	return t.Execute(buf, input)
-}
-
+// Configuration holds the top-level configuration
 type Configuration struct {
 	Configurations []NotifyConfig `json:"configurations" yaml:"configurations"`
 }
@@ -92,7 +71,7 @@ type ConfigurationLegacy struct {
 	Boxes             []string         `yaml:"boxes"             json:"boxes"`
 }
 
-// NotifyConfig holds the configuration
+// NotifyConfig holds the configuration for a single account
 type NotifyConfig struct {
 	Host              string           `yaml:"host"              json:"host"`
 	HostCMD           string           `yaml:"hostCMD"           json:"hostCMD"`
@@ -116,16 +95,15 @@ type NotifyConfig struct {
 	Boxes             []Box            `yaml:"boxes"             json:"boxes"`
 }
 
+// TLSOptionsStruct holds TLS configuration options
 type TLSOptionsStruct struct {
 	RejectUnauthorized bool `yaml:"rejectUnauthorized" json:"rejectUnauthorized"`
 	STARTTLS           bool `yaml:"starttls"           json:"starttls"`
 }
 
-/*
-Box stores all the necessary info needed to be passed in an
-IDLEEvent handler routine, in order to schedule commands and
-print informative messages
-*/
+// Box stores all the necessary info needed to be passed in an
+// IDLEEvent handler routine, in order to schedule commands and
+// print informative messages
 type Box struct {
 	Alias             string    `json:"-"                 yaml:"-"`
 	Mailbox           string    `json:"mailbox"           yaml:"mailbox"`
@@ -139,7 +117,34 @@ type Box struct {
 	ExistingEmail     uint32    `json:"-"                 yaml:"-"`
 }
 
-func legacyConverter(conf ConfigurationLegacy) []NotifyConfig {
+// IDLEEvent models an IDLE event (needed for template compilation test)
+type IDLEEvent struct {
+	Alias         string
+	Mailbox       string
+	Reason        EventType
+	ExistingEmail int
+	Box           Box
+}
+
+// CompileTemplate tests that the string template is valid, if any was
+// provided.
+func CompileTemplate(i string) error {
+	t, err := template.New("test").Parse(i)
+	if err != nil {
+		return err
+	}
+	buf := bytes.NewBuffer(nil)
+
+	input := IDLEEvent{
+		Alias:   "example@example.com",
+		Mailbox: "Inbox",
+	}
+
+	return t.Execute(buf, input)
+}
+
+// LegacyConverter converts old format configuration to new format
+func LegacyConverter(conf ConfigurationLegacy) []NotifyConfig {
 	var r []NotifyConfig
 	var c NotifyConfig
 	c.Host = conf.Host
@@ -166,93 +171,39 @@ func legacyConverter(conf ConfigurationLegacy) []NotifyConfig {
 	return append(r, c)
 }
 
-func loadConfiguration(path string, retries int) (*Configuration, error) {
-	var topConfiguration Configuration
-	if err := viper.Unmarshal(&topConfiguration); err != nil {
-		return nil, fmt.Errorf("can't parse the configuration: %q, error: %v", path, err)
+// SetFromConfig inherits config values to Box and validates templates
+func SetFromConfig(conf NotifyConfig, box Box) (Box, error) {
+	if box.OnNewMail == "" {
+		box.OnNewMail = conf.OnNewMail
+	}
+	err := CompileTemplate(box.OnNewMail)
+	if err != nil {
+		return box, err
+	}
+	if box.OnNewMailPost == "" {
+		box.OnNewMailPost = conf.OnNewMailPost
+	}
+	err = CompileTemplate(box.OnNewMailPost)
+	if err != nil {
+		return box, err
 	}
 
-	if topConfiguration.Configurations == nil {
-		var legacy ConfigurationLegacy
-		if err := viper.UnmarshalExact(&legacy); err != nil {
-			return nil, fmt.Errorf(
-				"can't parse the configuration in 'legacy' format: %s, error: %v",
-				path,
-				err,
-			)
-		}
-
-		logrus.Info("legacy format configuration detected")
-		topConfiguration.Configurations = legacyConverter(legacy)
+	// for deleted email
+	if box.OnDeletedMail == "" {
+		box.OnDeletedMail = conf.OnDeletedMail
+	}
+	err = CompileTemplate(box.OnDeletedMail)
+	if err != nil {
+		return box, err
+	}
+	if box.OnDeletedMailPost == "" {
+		box.OnDeletedMailPost = conf.OnDeletedMailPost
+	}
+	err = CompileTemplate(box.OnDeletedMailPost)
+	if err != nil {
+		return box, err
 	}
 
-	if len(topConfiguration.Configurations) > 0 &&
-		(topConfiguration.Configurations[0].Host == "" && topConfiguration.Configurations[0].HostCMD == "") {
-		return nil, fmt.Errorf(
-			"configuration file %q is empty or have invalid configuration format",
-			path,
-		)
-	}
-
-	for account := range topConfiguration.Configurations {
-		topConfiguration.Configurations[account] = retrieveCmd(
-			topConfiguration.Configurations[account],
-		)
-		if topConfiguration.Configurations[account].Alias == "" {
-			topConfiguration.Configurations[account].Alias = topConfiguration.Configurations[account].Username
-		}
-		if logrus.GetLevel() == logrus.DebugLevel {
-			topConfiguration.Configurations[account].Alias = "<?>"
-		}
-
-		conf := topConfiguration.Configurations[account]
-
-		// If there is no mailboxes, watch over all mailboxes of the account
-		if len(conf.Boxes) == 0 {
-			client, err := newIMAPIDLEClient(conf, retries)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"account %q, failed to create IMAP client, error: %w",
-					conf.Username,
-					err,
-				)
-			}
-			// nolint
-			defer client.Logout()
-
-			// NOTE(shackra): Having to do this is really disgusting, v2 offers a better way for listing mailboxes. I should consider updating.
-			ch := make(chan *imap.MailboxInfo)
-			go func() {
-				err := client.List("", "*", ch)
-				if err != nil {
-					logrus.WithError(err).
-						WithField("account", conf.Username).
-						Fatal("failed to list all mailboxes")
-				}
-			}()
-
-			for mailbox := range ch {
-				// Ignore mailboxes with attributes `\All` and `\Noselect`
-				if slices.Contains(mailbox.Attributes, "\\All") ||
-					slices.Contains(mailbox.Attributes, "\\Noselect") {
-					continue
-				}
-
-				box := setFromConfig(conf, Box{
-					Mailbox: mailbox.Name,
-				})
-				topConfiguration.Configurations[account].Boxes = append(
-					topConfiguration.Configurations[account].Boxes,
-					box,
-				)
-			}
-		} else {
-			// replace all listed mailboxes with the same mailboxes carrying values from the configuration
-			for mailbox := range topConfiguration.Configurations[account].Boxes {
-				topConfiguration.Configurations[account].Boxes[mailbox] = setFromConfig(conf, topConfiguration.Configurations[account].Boxes[mailbox])
-			}
-		}
-	}
-
-	return &topConfiguration, nil
+	box.Alias = conf.Alias
+	return box, nil
 }
