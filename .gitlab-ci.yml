@@ -10,7 +10,7 @@ testing:
   stage: test
   script:
     - go vet ./...
-    - go build -v cmd/goimapnotify
+    - go build -v ./cmd/goimapnotify
     # Run tests with coverage profile
     - go test -race -coverprofile=coverage.out -covermode=atomic ./...
     # Display coverage summary (used by GitLab coverage regex)
