@@ -51,7 +51,7 @@ flycheck_*.el
 *.dll
 *.so
 *.dylib
-goimapnotify
+/goimapnotify
 gin-bin
 
 # Test binary, build with `go test -c`
