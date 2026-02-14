@@ -2,6 +2,14 @@
 ## [Unreleased]
 
 
+<a name="2.5.5"></a>
+## [2.5.5] - 2026-02-14
+### Fixes
+- Fix .gitignore so that goimapnotify main file is not ignored
+- Fix build step in CI
+- Refactor code in packages and increase general code testing [vibe code]
+
+
 <a name="2.5.4"></a>
 ## [2.5.4] - 2025-11-26
 ### Features
@@ -134,7 +142,8 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.4...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...HEAD
+[2.5.5]: https://gitlab.com/shackra/goimapnotify/compare/2.5.4...2.5.5
 [2.5.4]: https://gitlab.com/shackra/goimapnotify/compare/2.5.3...2.5.4
 [2.5.3]: https://gitlab.com/shackra/goimapnotify/compare/2.5.2...2.5.3
 [2.5.2]: https://gitlab.com/shackra/goimapnotify/compare/2.5.1...2.5.2
