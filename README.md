@@ -85,7 +85,7 @@ You can also use xoAuth2 instead of password based authentication by setting the
 
 ## Install
 
-    go install gitlab.com/shackra/goimapnotify@latest
+    go install gitlab.com/shackra/goimapnotify/cmd/goimapnotify@latest
 
 ## Usage
 
