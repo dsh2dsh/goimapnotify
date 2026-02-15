@@ -13,11 +13,11 @@ testing:
     - go vet ./...
     - go build -v ./cmd/goimapnotify
     # Run tests with coverage profile
-    - go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    - go test -race -coverprofile="$CI_PROJECT_DIR/coverage.out" -covermode=atomic ./...
     # Generate HTML coverage report
-    - go tool cover -html=coverage.out -o coverage.html
+    - go tool cover -html=coverage.out -o "$CI_PROJECT_DIR/coverage.html"
     # Generate Cobertura XML for merge request coverage visualization
-    - gocover-cobertura < coverage.out > coverage.xml
+    - gocover-cobertura < "$CI_PROJECT_DIR/coverage.out" > "$CI_PROJECT_DIR/coverage.xml"
   artifacts:
     paths:
       - coverage.out
