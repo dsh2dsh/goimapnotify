@@ -9,15 +9,7 @@ stages:
 testing:
   stage: test
   script:
-    - go install github.com/boumenot/gocover-cobertura@latest
-    - go vet ./...
-    - go build -v ./cmd/goimapnotify
-    # Run tests with coverage profile
-    - go test -race -coverprofile="$CI_PROJECT_DIR/coverage.out" -covermode=atomic ./...
-    # Generate HTML coverage report
-    - go tool cover -html=coverage.out -o "$CI_PROJECT_DIR/coverage.html"
-    # Generate Cobertura XML for merge request coverage visualization
-    - gocover-cobertura < "$CI_PROJECT_DIR/coverage.out" > "$CI_PROJECT_DIR/coverage.xml"
+      - ./etc/scripts/ci.sh ./
   artifacts:
     paths:
       - coverage.out
