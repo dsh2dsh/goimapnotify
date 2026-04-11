@@ -13,7 +13,7 @@ GIT_BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 LDFLAGS := -X main.commit=$(GIT_COMMIT) -X main.gittag=$(GIT_TAG) -X main.branch=$(GIT_BRANCH)
 
 build:
-	go build -ldflags "$(LDFLAGS)" -gcflags  '-N -l'
+	go build -ldflags "$(LDFLAGS)" -gcflags  '-N -l' ./cmd/goimapnotify
 
 changelog:
 	git-chglog -o CHANGELOG.md 2.3.14..
