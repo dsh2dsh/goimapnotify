@@ -1,7 +1,7 @@
 package imap
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2025  Jorge Javier Araya Navarro
+// Copyright (C) 2017-2026  Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -78,11 +78,11 @@ func (w *WatchMailBox) Watch() {
 
 	// issue fake event to trigger a first time sync
 	go func() {
-		l.Info("issuing fake IMAP Event for first time sync")
+		l.Info("issuing fake IMAP Event for first time sync (skipping post-commands)")
 		w.idleEvent <- IDLEEvent{
 			Alias:         w.box.Alias,
 			Mailbox:       w.box.Mailbox,
-			Reason:        config.NEWMAIL,
+			Reason:        config.SYNC,
 			ExistingEmail: 0,
 			Box:           w.box,
 		}

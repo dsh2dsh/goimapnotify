@@ -1,6 +1,17 @@
 <a name="unreleased"></a>
 ## [Unreleased]
 
+### Features
+- Add event for first-run synchronization
+
+### Fixes
+- Fix Makefile build target
+- Fix postPatch in flake.nix and bump version
+- Upload coverage files even if test fails
+- Use `$CI_PROJECT_DIR` as output path for coverage files
+- Attempt to fix `WARNING: coverage.xml: no matching files`
+- Fix installation instructions
+
 
 <a name="2.5.5"></a>
 ## [2.5.5] - 2026-02-14

@@ -1,7 +1,7 @@
 package config
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2025	Jorge Javier Araya Navarro
+// Copyright (C) 2017-2026	Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ const (
 	NEWMAIL EventType = iota + 1
 	DELETEDMAIL
 	FLAGCHANGED
+	SYNC
 )
 
 func (e EventType) String() string {
@@ -38,6 +39,8 @@ func (e EventType) String() string {
 		return "Deleted Email"
 	case FLAGCHANGED:
 		return "Changed Flag on Email"
+	case SYNC:
+		return "Synchronize mailboxes without post-steps"
 	default:
 		return "Unknown Event"
 	}

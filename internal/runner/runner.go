@@ -1,7 +1,7 @@
 package runner
 
 // This file is part of goimapnotify
-// Copyright (C) 2017-2025	Jorge Javier Araya Navarro
+// Copyright (C) 2017-2026	Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -118,6 +118,11 @@ func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
 		if err != nil {
 			return err
 		}
+	case config.SYNC:
+		err := prepareAndRun(rsp.Box.OnNewMail, "", rsp)
+		if err != nil {
+			return err
+		}
 	default:
 		l.WithField("reason", rsp.Reason).Error("unknown reason value, ignoring...")
 	}
@@ -132,6 +137,9 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 	}
 	if event.Reason == config.FLAGCHANGED {
 		callKind = "Changed"
+	}
+	if event.Reason == config.SYNC {
+		callKind = "Sync"
 	}
 
 	if on == "SKIP" || on == "" {
