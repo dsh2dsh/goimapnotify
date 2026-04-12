@@ -5,6 +5,7 @@
 - Add event for first-run synchronization
 
 ### Fixes
+- Fix race condition in mock structure
 - Fix Makefile build target
 - Fix postPatch in flake.nix and bump version
 - Upload coverage files even if test fails

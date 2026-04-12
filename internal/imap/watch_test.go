@@ -41,6 +41,7 @@ type MockWatchClient struct {
 	selectCalls  []selectCallRecord
 	idleCalls    int
 	idleStopChan <-chan struct{}
+	mu           sync.Mutex
 }
 
 type selectCallRecord struct {
@@ -55,7 +56,9 @@ func NewMockWatchClient() *MockWatchClient {
 }
 
 func (m *MockWatchClient) Select(name string, readOnly bool) (*imap.MailboxStatus, error) {
+	m.mu.Lock()
 	m.selectCalls = append(m.selectCalls, selectCallRecord{name, readOnly})
+	m.mu.Unlock()
 	if m.SelectFunc != nil {
 		return m.SelectFunc(name, readOnly)
 	}
@@ -66,12 +69,17 @@ func (m *MockWatchClient) LoggedOut() <-chan struct{} {
 	if m.LoggedOutFunc != nil {
 		return m.LoggedOutFunc()
 	}
-	return m.loggedOutCh
+	m.mu.Lock()
+	ch := m.loggedOutCh
+	m.mu.Unlock()
+	return ch
 }
 
 func (m *MockWatchClient) IdleWithFallback(stop <-chan struct{}, pollInterval time.Duration) error {
+	m.mu.Lock()
 	m.idleCalls++
 	m.idleStopChan = stop
+	m.mu.Unlock()
 	if m.IdleWithFallbackFunc != nil {
 		return m.IdleWithFallbackFunc(stop, pollInterval)
 	}
@@ -81,7 +89,9 @@ func (m *MockWatchClient) IdleWithFallback(stop <-chan struct{}, pollInterval ti
 }
 
 func (m *MockWatchClient) SetUpdatesChannel(updates chan client.Update) {
+	m.mu.Lock()
 	m.updates = updates
+	m.mu.Unlock()
 	if m.SetUpdatesFunc != nil {
 		m.SetUpdatesFunc(updates)
 	}
@@ -89,14 +99,18 @@ func (m *MockWatchClient) SetUpdatesChannel(updates chan client.Update) {
 
 // SendUpdate sends an update through the updates channel
 func (m *MockWatchClient) SendUpdate(update client.Update) {
+	m.mu.Lock()
 	if m.updates != nil {
 		m.updates <- update
 	}
+	m.mu.Unlock()
 }
 
 // CloseLoggedOut closes the logged out channel to simulate disconnect
 func (m *MockWatchClient) CloseLoggedOut() {
+	m.mu.Lock()
 	close(m.loggedOutCh)
+	m.mu.Unlock()
 }
 
 // TestIDLEEvent tests the IDLEEvent struct
@@ -163,8 +177,8 @@ func TestWatchMailBox_Watch_InitialSync(t *testing.T) {
 	// Wait for the initial sync event
 	select {
 	case event := <-idleEvents:
-		if event.Reason != config.NEWMAIL {
-			t.Errorf("Initial event Reason = %v, want %v", event.Reason, config.NEWMAIL)
+		if event.Reason != config.SYNC {
+			t.Errorf("Initial event Reason = %v, want %v", event.Reason, config.SYNC)
 		}
 		if event.Alias != "test@example.com" {
 			t.Errorf("Initial event Alias = %q, want %q", event.Alias, "test@example.com")
@@ -582,9 +596,12 @@ func TestWatchMailBox_Watch_SelectCallsCorrectly(t *testing.T) {
 
 	var selectName string
 	var selectReadOnly bool
+	var mu sync.Mutex
 	mockClient.SelectFunc = func(name string, readOnly bool) (*imap.MailboxStatus, error) {
+		mu.Lock()
 		selectName = name
 		selectReadOnly = readOnly
+		mu.Unlock()
 		return &imap.MailboxStatus{Messages: 0}, nil
 	}
 
@@ -603,10 +620,14 @@ func TestWatchMailBox_Watch_SelectCallsCorrectly(t *testing.T) {
 	// Give time for Select to be called
 	time.Sleep(50 * time.Millisecond)
 
-	if selectName != "Sent" {
-		t.Errorf("Select name = %q, want %q", selectName, "Sent")
+	mu.Lock()
+	name := selectName
+	readOnly := selectReadOnly
+	mu.Unlock()
+	if name != "Sent" {
+		t.Errorf("Select name = %q, want %q", name, "Sent")
 	}
-	if !selectReadOnly {
+	if !readOnly {
 		t.Error("Select readOnly = false, want true")
 	}
 
