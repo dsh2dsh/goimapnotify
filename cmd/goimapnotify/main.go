@@ -188,6 +188,11 @@ func main() {
 		5,
 		"Number of attempts when connecting to an IMAP server, using exponential backoff",
 	)
+	useSyslog := flag.Bool(
+		"syslog",
+		false,
+		"Send log output to syslog instead of stderr (not available on Windows)",
+	)
 
 	flag.Usage = usage
 
@@ -207,6 +212,12 @@ func main() {
 		logrus.SetLevel(logrus.ErrorLevel)
 	default:
 		logrus.Fatalf("unknown logging level %q", *loglevel)
+	}
+
+	if *useSyslog {
+		if err := util.EnableSyslog(); err != nil {
+			logrus.WithError(err).Fatal("failed to enable syslog")
+		}
 	}
 
 	logrus.Infof("ℹ Running commit %s, tag %s, branch %s", commit, gittag, branch)
