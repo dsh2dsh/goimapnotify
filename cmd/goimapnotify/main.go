@@ -19,13 +19,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	goimap "github.com/emersion/go-imap"
 	"github.com/sirupsen/logrus"
@@ -33,6 +36,7 @@ import (
 
 	"gitlab.com/shackra/goimapnotify/internal/config"
 	"gitlab.com/shackra/goimapnotify/internal/imap"
+	netmon "gitlab.com/shackra/goimapnotify/internal/net"
 	"gitlab.com/shackra/goimapnotify/internal/runner"
 	"gitlab.com/shackra/goimapnotify/internal/util"
 )
@@ -283,38 +287,106 @@ func main() {
 		*/
 		for _, account := range topConfig.Configurations {
 			for _, mailbox := range account.Boxes {
+				key := account.Alias + mailbox.Mailbox
+				running.Config[key] = account
+
 				client, err := imap.NewIMAPIDLEClient(account, *dialRetries)
 				if err != nil {
 					logrus.WithError(err).
 						WithField("account", account.Alias).
-						Fatal("cannot make IMAP client")
+						Warn("Initial connection failed, retrying in background")
+					mailbox.Alias = account.Alias
+					wg.Add(1)
+					go reconnectWatcher(
+						imap.BoxEvent{UniqID: key, Mailbox: mailbox},
+						account, idleChan, boxChan, quitChan, wg, *dialRetries,
+					)
+					continue
 				}
-				key := account.Alias + mailbox.Mailbox
-				running.Config[key] = account
 				imap.NewWatchBox(client, account, mailbox, idleChan, boxChan, quitChan, wg)
 			}
 		}
 	}
 
+	// Start network monitor if configured
+	var netChan chan netmon.NetworkEvent
+	checkInterval := topConfig.NetworkCheckInterval
+	if checkInterval == 0 {
+		checkInterval = 30 // default 30 seconds
+	}
+	if checkInterval > 0 {
+		netChan = make(chan netmon.NetworkEvent, 1)
+		var connectivityAddrs []string
+		if len(topConfig.ConnectivityHosts) > 0 {
+			connectivityAddrs = topConfig.ConnectivityHosts
+		} else {
+			connectivityAddrs = []string{"archlinux.org:80", "ubuntu.com:80"}
+		}
+		hosts := make([]netmon.HostPort, 0, len(connectivityAddrs))
+		for _, addr := range connectivityAddrs {
+			h, portStr, err := net.SplitHostPort(addr)
+			if err != nil {
+				logrus.WithError(err).Warnf("Invalid connectivityHosts entry %q, skipping", addr)
+				continue
+			}
+			port, err := strconv.Atoi(portStr)
+			if err != nil {
+				logrus.WithError(err).
+					Warnf("Invalid port in connectivityHosts entry %q, skipping", addr)
+				continue
+			}
+			hosts = append(hosts, netmon.HostPort{Host: h, Port: port})
+		}
+		monitor := netmon.NewNetworkMonitor(
+			hosts,
+			time.Duration(checkInterval)*time.Second,
+			5*time.Second,
+			netChan,
+			quitChan,
+		)
+		monitor.Start(wg)
+		logrus.Infof("Network monitor started, checking every %d seconds", checkInterval)
+	}
+
+	var networkDown bool
+	var pendingReconnects []imap.BoxEvent
+
 	for idleForever {
 		select {
+		case netEvent := <-netChan:
+			if netEvent.State == netmon.NetworkDown {
+				networkDown = true
+			} else if netEvent.State == netmon.NetworkUp {
+				networkDown = false
+				if len(pendingReconnects) > 0 {
+					logrus.Infof("Network restored, reconnecting %d watcher(s)", len(pendingReconnects))
+					for _, ev := range pendingReconnects {
+						key := ev.Mailbox.Alias + ev.Mailbox.Mailbox
+						wg.Add(1)
+						go reconnectWatcher(ev, running.Config[key], idleChan, boxChan, quitChan, wg, *dialRetries)
+					}
+					pendingReconnects = nil
+				}
+			}
 		case boxEvent := <-boxChan:
-			key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
 			l := logrus.WithField("alias", boxEvent.Mailbox.Alias).
 				WithField("mailbox", boxEvent.Mailbox.Mailbox)
-			l.Info("Restarting watcher for mailbox")
-			client, fErr := imap.NewIMAPIDLEClient(running.Config[key], *dialRetries)
-			if fErr != nil {
-				l.WithError(fErr).Fatal("Something went wrong creating IDLE client")
+			if networkDown {
+				l.Info("Watcher stopped, deferring reconnection until network is restored")
+				pendingReconnects = append(pendingReconnects, boxEvent)
+				continue
 			}
-			imap.NewWatchBox(
-				client,
+			l.Info("Restarting watcher for mailbox")
+			key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
+			wg.Add(1)
+			go reconnectWatcher(
+				boxEvent,
 				running.Config[key],
-				boxEvent.Mailbox,
 				idleChan,
 				boxChan,
 				quitChan,
 				wg,
+				*dialRetries,
 			)
 		case <-quit:
 			// OS asked nicely to close, we ask our
@@ -342,4 +414,59 @@ func main() {
 	wg.Wait()
 	util.PrintDonate(os.Stderr, 11)
 	logrus.Info("bye")
+}
+
+func reconnectWatcher(
+	event imap.BoxEvent,
+	cfg config.NotifyConfig,
+	idleChan chan<- imap.IDLEEvent,
+	boxChan chan<- imap.BoxEvent,
+	quitChan <-chan struct{},
+	wg *sync.WaitGroup,
+	retries int,
+) {
+	defer wg.Done()
+
+	l := logrus.WithField("alias", event.Mailbox.Alias).
+		WithField("mailbox", event.Mailbox.Mailbox)
+
+	backoff := time.Second
+	maxBackoff := 5 * time.Minute
+
+	for {
+		select {
+		case <-quitChan:
+			l.Info("Reconnection cancelled, shutting down")
+			return
+		default:
+		}
+
+		client, err := imap.NewIMAPIDLEClient(cfg, retries)
+		if err != nil {
+			if isAuthError(err) && backoff < 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			l.WithError(err).Warnf("Reconnection failed, retrying in %s", backoff)
+			select {
+			case <-time.After(backoff):
+			case <-quitChan:
+				l.Info("Reconnection cancelled, shutting down")
+				return
+			}
+			backoff = min(backoff*2, maxBackoff)
+			continue
+		}
+
+		l.Info("Reconnected successfully")
+		imap.NewWatchBox(client, cfg, event.Mailbox, idleChan, boxChan, quitChan, wg)
+		return
+	}
+}
+
+func isAuthError(err error) bool {
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such user") ||
+		strings.Contains(msg, "too many login attempts") ||
+		strings.Contains(msg, "authentication failed") ||
+		strings.Contains(msg, "invalid credentials")
 }
