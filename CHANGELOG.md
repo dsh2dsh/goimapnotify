@@ -1,7 +1,12 @@
 <a name="unreleased"></a>
 ## [Unreleased]
 
+
+<a name="2.5.6"></a>
+## [2.5.6] - 2026-06-08
 ### Features
+- Detect network changes and reconnect resiliently
+- Add `--syslog` flag to redirect logs to syslog
 - Add event for first-run synchronization
 
 ### Fixes
@@ -154,7 +159,8 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.6...HEAD
+[2.5.6]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...2.5.6
 [2.5.5]: https://gitlab.com/shackra/goimapnotify/compare/2.5.4...2.5.5
 [2.5.4]: https://gitlab.com/shackra/goimapnotify/compare/2.5.3...2.5.4
 [2.5.3]: https://gitlab.com/shackra/goimapnotify/compare/2.5.2...2.5.3
