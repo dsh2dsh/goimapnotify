@@ -2,7 +2,7 @@
 [![pipeline status](https://gitlab.com/shackra/goimapnotify/badges/master/pipeline.svg)](https://gitlab.com/shackra/goimapnotify/commits/master)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K1XEZCQ)
 [![Radicle](https://img.shields.io/badge/Radicle-rad%3Az39RJH...d1LFah-purple?style=for-the-badge)](https://radicle.network/nodes/jardin.jorgearaya.dev/rad:z39RJHSHs166S5kr8Qstj6kd1LFah)
-[![Backup on GitLab](https://img.shields.io/badge/Backup-GitHub-black?style=for-the-badge&logo=gitlab)](https://gitlab.com/shackra/goimapnotify)
+[![Backup on GitLab](https://img.shields.io/badge/Backup-GitLab-black?style=for-the-badge&logo=gitlab)](https://gitlab.com/shackra/goimapnotify)
 
 Execute scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE, Golang version.
 
