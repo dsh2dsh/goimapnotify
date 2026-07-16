@@ -1,6 +1,17 @@
-# Go IMAP notify [![pipeline status](https://gitlab.com/shackra/goimapnotify/badges/master/pipeline.svg)](https://gitlab.com/shackra/goimapnotify/commits/master) [![coverage report](https://gitlab.com/shackra/goimapnotify/badges/master/coverage.svg)](https://gitlab.com/shackra/goimapnotify/commits/master) [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K1XEZCQ) [![Support me on Patreon](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.vercel.app%2Fapi%3Fusername%3Dshackra%26type%3Dpatrons&style=flat)](https://patreon.com/shackra)
+# goimapnotify
+[![pipeline status](https://gitlab.com/shackra/goimapnotify/badges/master/pipeline.svg)](https://gitlab.com/shackra/goimapnotify/commits/master)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K1XEZCQ)
+[![Radicle](https://img.shields.io/badge/Radicle-rad%3Az39RJH...d1LFah-purple?style=for-the-badge)](https://radicle.network/nodes/jardin.jorgearaya.dev/rad:z39RJHSHs166S5kr8Qstj6kd1LFah)
+[![Backup on GitLab](https://img.shields.io/badge/Backup-GitHub-black?style=for-the-badge&logo=gitlab)](https://gitlab.com/shackra/goimapnotify)
 
 Execute scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE, Golang version.
+
+> [!IMPORTANT]  
+> **This GitLab repository is only a backup mirror.**
+> The **canonical repository** is on **Radicle**: `rad:z39RJHSHs166S5kr8Qstj6kd1LFah`
+>
+> Please submit **[issues](https://radicle.network/nodes/jardin.jorgearaya.dev/rad:z39RJHSHs166S5kr8Qstj6kd1LFah/issues) and [patches](https://radicle.network/nodes/jardin.jorgearaya.dev/rad:z39RJHSHs166S5kr8Qstj6kd1LFah/patches)** exclusively to the repository
+> on the Radicle network.
 
 Please read the `CHANGELOG` file to know what's new.
 
