@@ -705,7 +705,7 @@ func TestNewWatchBoxWithClient_WaitGroupManagement(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Create multiple watchers
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		NewWatchBoxWithClient(
 			mockClient,
 			config.NotifyConfig{},

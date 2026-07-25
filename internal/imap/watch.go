@@ -182,10 +182,5 @@ func NewWatchBoxWithClient(
 		boxEvent:  b,
 		quit:      q,
 	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		w.Watch()
-	}()
+	wg.Go(w.Watch)
 }

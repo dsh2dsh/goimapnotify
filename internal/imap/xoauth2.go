@@ -52,14 +52,14 @@ type xoauth2Client struct {
 func (a *xoauth2Client) Start() (mech string, ir []byte, err error) {
 	mech = Xoauth2
 	ir = []byte("user=" + a.Username + "\x01auth=Bearer " + a.Token + "\x01\x01")
-	return
+	return mech, ir, err
 }
 
 func (a *xoauth2Client) Next(challenge []byte) ([]byte, error) {
 	// Server sent an error response
 	xoauth2Err := &Xoauth2Error{}
 	if err := json.Unmarshal(challenge, xoauth2Err); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imap: %w", err)
 	} else {
 		return nil, xoauth2Err
 	}

@@ -169,14 +169,12 @@ func TestXoauth2Client_Next(t *testing.T) {
 
 			if tt.wantErrType == nil {
 				// Expect Xoauth2Error
-				var xoauth2Err *Xoauth2Error
-				if !errors.As(err, &xoauth2Err) {
+				if _, ok := errors.AsType[*Xoauth2Error](err); !ok {
 					t.Errorf("Next() error type = %T, want *Xoauth2Error", err)
 				}
 			} else {
 				// Expect JSON error
-				var syntaxErr *json.SyntaxError
-				if !errors.As(err, &syntaxErr) {
+				if _, ok := errors.AsType[*json.SyntaxError](err); !ok {
 					t.Errorf("Next() error type = %T, want *json.SyntaxError", err)
 				}
 			}

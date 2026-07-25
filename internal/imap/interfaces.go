@@ -18,6 +18,7 @@ package imap
 
 import (
 	"crypto/tls"
+	"fmt"
 	"io"
 	"time"
 
@@ -38,7 +39,7 @@ type IMAPClientInterface interface {
 
 	// Connection methods
 	StartTLS(config *tls.Config) error
-	Support(cap string) (bool, error)
+	Support(capability string) (bool, error)
 	Logout() error
 	LoggedOut() <-chan struct{}
 	SetDebug(w io.Writer)
@@ -96,7 +97,7 @@ type clientWrapper struct {
 func (d *defaultDialer) Dial(addr string) (IMAPClientInterface, error) {
 	c, err := client.Dial(addr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imap: %w", err)
 	}
 	return &clientWrapper{c}, nil
 }
@@ -105,7 +106,7 @@ func (d *defaultDialer) Dial(addr string) (IMAPClientInterface, error) {
 func (d *defaultDialer) DialTLS(addr string, config *tls.Config) (IMAPClientInterface, error) {
 	c, err := client.DialTLS(addr, config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("imap: %w", err)
 	}
 	return &clientWrapper{c}, nil
 }
@@ -132,7 +133,7 @@ type IMAPIDLEClientWrapper struct {
 
 // SetUpdatesChannel sets the channel for receiving updates
 func (w *IMAPIDLEClientWrapper) SetUpdatesChannel(updates chan client.Update) {
-	w.IMAPIDLEClient.Updates = updates
+	w.Updates = updates
 }
 
 // WrapIMAPIDLEClient wraps an IMAPIDLEClient to implement WatchClientInterface

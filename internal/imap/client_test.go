@@ -36,7 +36,7 @@ type MockIMAPClient struct {
 	AuthenticateFunc func(auth sasl.Client) error
 	SupportAuthFunc  func(mech string) (bool, error)
 	StartTLSFunc     func(config *tls.Config) error
-	SupportFunc      func(cap string) (bool, error)
+	SupportFunc      func(capability string) (bool, error)
 	LogoutFunc       func() error
 	LoggedOutFunc    func() <-chan struct{}
 	SelectFunc       func(name string, readOnly bool) (*imap.MailboxStatus, error)
@@ -95,10 +95,10 @@ func (m *MockIMAPClient) StartTLS(config *tls.Config) error {
 	return nil
 }
 
-func (m *MockIMAPClient) Support(cap string) (bool, error) {
-	m.SupportCalls = append(m.SupportCalls, cap)
+func (m *MockIMAPClient) Support(capability string) (bool, error) {
+	m.SupportCalls = append(m.SupportCalls, capability)
 	if m.SupportFunc != nil {
-		return m.SupportFunc(cap)
+		return m.SupportFunc(capability)
 	}
 	return false, nil
 }
@@ -161,15 +161,6 @@ func (m *MockDialer) DialTLS(addr string, config *tls.Config) (IMAPClientInterfa
 		return m.DialTLSFunc(addr, config)
 	}
 	return &MockIMAPClient{}, nil
-}
-
-// TestIMAPIDLEClient_Structure tests the IMAPIDLEClient struct
-func TestIMAPIDLEClient_Structure(t *testing.T) {
-	// Verify the struct can be instantiated
-	c := &IMAPIDLEClient{}
-	if c == nil {
-		t.Fatal("IMAPIDLEClient should be instantiable")
-	}
 }
 
 // TestVersion tests the Version variable
@@ -445,7 +436,7 @@ func TestNewClientWithDialer(t *testing.T) {
 			},
 			setupClient: func() *MockIMAPClient {
 				return &MockIMAPClient{
-					SupportFunc: func(cap string) (bool, error) {
+					SupportFunc: func(capability string) (bool, error) {
 						return false, errors.New("capability error")
 					},
 				}

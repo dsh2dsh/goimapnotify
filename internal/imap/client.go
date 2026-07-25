@@ -18,6 +18,7 @@ package imap
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -59,7 +60,7 @@ func NewClient(conf config.NotifyConfig, retries int) (*client.Client, error) {
 	}
 
 	// This shouldn't happen with the default dialer, but handle it gracefully
-	return nil, fmt.Errorf("unexpected client type returned from dialer")
+	return nil, errors.New("unexpected client type returned from dialer")
 }
 
 // NewClientWithDialer creates a new IMAP client with the given configuration and dialer.
@@ -149,7 +150,7 @@ func NewClientWithDialer(
 			})
 			if err != nil {
 				if !strings.Contains(err.Error(), "Parameter list contains a non-string: expected a string") && !strings.Contains(err.Error(), "Unrecognised command") {
-					return nil, err
+					return nil, fmt.Errorf("imap: %w", err)
 				}
 				logrus.WithError(err).Debug("IMAP server supports ID command but gave malformed response, ignoring...")
 			}
