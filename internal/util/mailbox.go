@@ -47,7 +47,7 @@ func PrintDelimiter(c *client.Client) (int, error) {
 }
 
 // WalkMailbox recursively lists mailboxes with tree visualization
-func WalkMailbox(c *client.Client, b string, l, max int) error {
+func WalkMailbox(c *client.Client, b string, l, mailboxCount int) error {
 	// FIXME: This can be done better
 	mailboxes := make(chan *imap.MailboxInfo, 10)
 	done := make(chan error, 1)
@@ -57,13 +57,13 @@ func WalkMailbox(c *client.Client, b string, l, max int) error {
 
 	pos := 0
 	for m := range mailboxes {
-		box := boxchar(pos, l, max)
+		box := boxchar(pos, l, mailboxCount)
 		fmt.Println(box, m.Name)
 		pos += 1
 		// Check if mailbox has children mailboxes
 		for _, attr := range m.Attributes {
 			if attr == "\\Haschildren" {
-				err := WalkMailbox(c, m.Name, l+1, max)
+				err := WalkMailbox(c, m.Name, l+1, mailboxCount)
 				if err != nil {
 					logrus.WithError(err).Error("cannot keep walking mailboxes\n")
 					return err

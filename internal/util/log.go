@@ -25,6 +25,10 @@ func CensorCredentials(in io.Reader, out io.Writer) {
 			logrus.WithError(err).Error("unable to write censored line")
 		}
 	}
+
+	if err := scanner.Err(); err != nil {
+		logrus.WithError(err).Error("unable to scan censored line")
+	}
 }
 
 // CensorPasswordInLogin replaces password in LOGIN command

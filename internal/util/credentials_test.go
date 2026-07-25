@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 package util
 
@@ -20,7 +19,6 @@ package util
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
@@ -244,7 +242,7 @@ func TestRetrieveCmd(t *testing.T) {
 // TestPasswordCMD is the original test (kept for compatibility)
 func TestPasswordCMD(t *testing.T) {
 	password := "secret123"
-	c := RetrievePasswordCmd(config.NotifyConfig{PasswordCMD: fmt.Sprintf("echo %s", password)})
+	c := RetrievePasswordCmd(config.NotifyConfig{PasswordCMD: "echo " + password})
 	if c.Password != password {
 		t.Fatalf("'%s' != '%s'", c.Password, password)
 	}

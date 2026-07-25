@@ -32,7 +32,7 @@ func RetrievePasswordCmd(conf config.NotifyConfig) config.NotifyConfig {
 		cmd.Stdout = nil
 		buf, err := cmd.Output()
 		if err == nil {
-			conf.Password = strings.Trim(string(buf[:]), "\n")
+			conf.Password = strings.Trim(string(buf), "\n")
 		} else {
 			logrus.WithError(err).Fatal("cannot retrieve password from command")
 		}
@@ -48,7 +48,7 @@ func RetrieveUsernameCmd(conf config.NotifyConfig) config.NotifyConfig {
 		cmd.Stdout = nil
 		buf, err := cmd.Output()
 		if err == nil {
-			conf.Username = strings.Trim(string(buf[:]), "\n")
+			conf.Username = strings.Trim(string(buf), "\n")
 		} else {
 			logrus.WithError(err).Fatal("cannot retrieve username from command")
 		}
@@ -64,7 +64,7 @@ func RetrieveHostCmd(conf config.NotifyConfig) config.NotifyConfig {
 		cmd.Stdout = nil
 		buf, err := cmd.Output()
 		if err == nil {
-			conf.Host = strings.Trim(string(buf[:]), "\n")
+			conf.Host = strings.Trim(string(buf), "\n")
 		} else {
 			logrus.WithError(err).Fatal("cannot retrieve host from command")
 		}
