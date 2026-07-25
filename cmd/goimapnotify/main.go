@@ -1,7 +1,7 @@
 package main
 
 // Execute scripts on events using IDLE imap command (Go version)
-// Copyright (C) 2017-2025  Jorge Javier Araya Navarro
+// Copyright (C) 2017-2026  Jorge Javier Araya Navarro
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -154,7 +154,10 @@ func loadConfiguration(path string, retries int) (*config.Configuration, error) 
 		} else {
 			// replace all listed mailboxes with the same mailboxes carrying values from the configuration
 			for mailbox := range topConfiguration.Configurations[account].Boxes {
-				box, err := config.SetFromConfig(conf, topConfiguration.Configurations[account].Boxes[mailbox])
+				box, err := config.SetFromConfig(
+					conf,
+					topConfiguration.Configurations[account].Boxes[mailbox],
+				)
 				if err != nil {
 					logrus.WithError(err).Fatal("template is invalid")
 				}
@@ -359,11 +362,22 @@ func main() {
 			} else if netEvent.State == netmon.NetworkUp {
 				networkDown = false
 				if len(pendingReconnects) > 0 {
-					logrus.Infof("Network restored, reconnecting %d watcher(s)", len(pendingReconnects))
+					logrus.Infof(
+						"Network restored, reconnecting %d watcher(s)",
+						len(pendingReconnects),
+					)
 					for _, ev := range pendingReconnects {
 						key := ev.Mailbox.Alias + ev.Mailbox.Mailbox
 						wg.Add(1)
-						go reconnectWatcher(ev, running.Config[key], idleChan, boxChan, quitChan, wg, *dialRetries)
+						go reconnectWatcher(
+							ev,
+							running.Config[key],
+							idleChan,
+							boxChan,
+							quitChan,
+							wg,
+							*dialRetries,
+						)
 					}
 					pendingReconnects = nil
 				}
