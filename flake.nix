@@ -120,7 +120,7 @@
               gdlv
               panicparse
 
-              nodePackages_latest.bash-language-server
+              bash-language-server
 
               git-chglog
             ];
