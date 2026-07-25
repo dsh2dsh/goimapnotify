@@ -34,11 +34,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
-	"gitlab.com/shackra/goimapnotify/internal/imap"
-	netmon "gitlab.com/shackra/goimapnotify/internal/net"
-	"gitlab.com/shackra/goimapnotify/internal/runner"
-	"gitlab.com/shackra/goimapnotify/internal/util"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/imap"
+	netmon "github.com/dsh2dsh/goimapnotify/internal/net"
+	"github.com/dsh2dsh/goimapnotify/internal/runner"
+	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 var (

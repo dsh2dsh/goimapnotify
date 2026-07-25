@@ -1,4 +1,4 @@
-;;; Directory Local Variables
+;;; Directory Local Variables            -*- no-byte-compile: t -*-
 ;;; For more information see (info "(emacs) Directory Variables")
 
-((go-mode . ((go-tag-args . ("-transform" "camelcase")))))
+((go-ts-mode . ((lsp-go-goimports-local . "github.com/dsh2dsh/goimapnotify"))))
