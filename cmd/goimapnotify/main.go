@@ -71,14 +71,14 @@ func usage() {
 func loadConfiguration(path string, retries int) (*config.Configuration, error) {
 	var topConfiguration config.Configuration
 	if err := viper.Unmarshal(&topConfiguration); err != nil {
-		return nil, fmt.Errorf("can't parse the configuration: %q, error: %v", path, err)
+		return nil, fmt.Errorf("can't parse the configuration: %q, error: %w", path, err)
 	}
 
 	if topConfiguration.Configurations == nil {
 		var legacy config.ConfigurationLegacy
 		if err := viper.UnmarshalExact(&legacy); err != nil {
 			return nil, fmt.Errorf(
-				"can't parse the configuration in 'legacy' format: %s, error: %v",
+				"can't parse the configuration in 'legacy' format: %s, error: %w",
 				path,
 				err,
 			)
@@ -119,7 +119,6 @@ func loadConfiguration(path string, retries int) (*config.Configuration, error) 
 					err,
 				)
 			}
-			// nolint
 			defer client.Logout()
 
 			// NOTE(shackra): Having to do this is really disgusting, v2 offers a better way for listing mailboxes. I should consider updating.
@@ -172,7 +171,7 @@ func main() {
 		"conf",
 		filepath.Join(
 			getDefaultConfigPath(),
-			fmt.Sprintf("goimapnotify.%s", viper.SupportedExts[2]),
+			"goimapnotify."+viper.SupportedExts[2],
 		),
 		"Configuration file, supported formats: json, yaml/yml, toml",
 	)
@@ -255,17 +254,16 @@ func main() {
 					WithField("account", account.Alias).
 					Fatal("something went wrong creating IMAP client")
 			}
-			// nolint
 			defer client.Logout()
 
-			max, err := util.PrintDelimiter(client)
+			mailboxCount, err := util.PrintDelimiter(client)
 			if err != nil {
 				logrus.WithField("alias", account.Alias).
 					WithError(err).
 					Warning("listing mailboxes finished with error")
 			}
 			logrus.WithField("account", account.Alias).Info("walking through the account mailboxes")
-			err = util.WalkMailbox(client, "", 0, max)
+			err = util.WalkMailbox(client, "", 0, mailboxCount)
 			if err != nil {
 				logrus.WithField("account", account.Alias).
 					WithError(err).
@@ -354,9 +352,10 @@ func main() {
 	for idleForever {
 		select {
 		case netEvent := <-netChan:
-			if netEvent.State == netmon.NetworkDown {
+			switch netEvent.State {
+			case netmon.NetworkDown:
 				networkDown = true
-			} else if netEvent.State == netmon.NetworkUp {
+			case netmon.NetworkUp:
 				networkDown = false
 				if len(pendingReconnects) > 0 {
 					logrus.Infof("Network restored, reconnecting %d watcher(s)", len(pendingReconnects))
@@ -394,11 +393,10 @@ func main() {
 			close(quitChan)
 			idleForever = false
 		case idleEvent := <-idleChan:
-			wg.Add(1)
-			go func() {
+			wg.Go(func() {
 				defer wg.Done()
 				running.Schedule(idleEvent, quitChan, queueChan)
-			}()
+			})
 		case event := <-queueChan:
 			wg.Add(1)
 			err := running.Run(event)
