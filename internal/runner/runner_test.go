@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 package runner
 
@@ -193,11 +192,7 @@ func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 
 	// Run Schedule in a goroutine
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		rb.Schedule(event, done, queue)
-	}()
+	wg.Go(func() { rb.Schedule(event, done, queue) })
 
 	// Give it a moment
 	time.Sleep(50 * time.Millisecond)
@@ -268,7 +263,7 @@ func TestRunningBox_Schedule_Debouncing(t *testing.T) {
 	queue := make(chan imap.IDLEEvent, 10)
 
 	// Start multiple Schedule calls rapidly
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		go rb.Schedule(event, done, queue)
 		time.Sleep(100 * time.Millisecond) // Trigger reschedules
 	}
@@ -378,7 +373,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 	received := make(map[string]bool)
 	timeout := time.After(time.Second)
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		select {
 		case event := <-queue:
 			received[event.Mailbox] = true
@@ -796,7 +791,7 @@ func TestRunningBox_Schedule_TimerMapIsolation(t *testing.T) {
 	received := make(map[string]bool)
 	timeout := time.After(time.Second)
 
-	for i := 0; i < len(users); i++ {
+	for range len(users) {
 		select {
 		case event := <-queue:
 			received[event.Alias] = true

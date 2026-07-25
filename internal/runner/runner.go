@@ -18,6 +18,7 @@ package runner
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sync"
@@ -164,11 +165,10 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 	})
 	out, err := call.Output()
 	if err != nil {
-		exiterr, ok := err.(*exec.ExitError)
-		if ok {
+		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
 			logrus.Errorf("stderror: %q", string(exiterr.Stderr))
 		}
-		return fmt.Errorf("On%sMail command failed: %v", callKind, err)
+		return fmt.Errorf("On%sMail command failed: %w", callKind, err)
 	}
 	logrus.Infof("stdout: %q", string(out))
 
@@ -194,11 +194,10 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 	})
 	out, err = call.Output()
 	if err != nil {
-		exiterr, ok := err.(*exec.ExitError)
-		if ok {
+		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
 			logrus.Errorf("stderror: %q", string(exiterr.Stderr))
 		}
-		return fmt.Errorf("On%sMailPost command failed: %v", callKind, err)
+		return fmt.Errorf("On%sMailPost command failed: %w", callKind, err)
 	}
 	logrus.Infof("stdout: %q", string(out))
 
