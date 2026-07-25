@@ -129,7 +129,7 @@ encoded tokens in `passwordCMD`. Examples:
 ## Install
 
 ```
-go install github.com/dsh2dsh/goimapnotify/cmd/goimapnotify@latest
+go install github.com/dsh2dsh/goimapnotify@latest
 ```
 
 ## Usage

@@ -1,4 +1,4 @@
-package main
+package cli
 
 // Execute scripts on events using IDLE imap command (Go version)
 // Copyright (C) 2017-2025  Jorge Javier Araya Navarro
@@ -165,7 +165,7 @@ func loadConfiguration(path string, retries int) (*config.Configuration, error) 
 	return &topConfiguration, nil
 }
 
-func main() {
+func Run() {
 	// imap.DefaultLogMask = imap.LogConn | imap.LogRaw
 	fileconf := flag.String(
 		"conf",
