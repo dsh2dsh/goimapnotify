@@ -68,6 +68,10 @@ func usage() {
 	_, _ = fmt.Fprint(flag.CommandLine.Output(), "\n"+msg)
 }
 
+func version() {
+	fmt.Fprintln(flag.CommandLine.Output(), imap.Version)
+}
+
 func loadConfiguration(path string, retries int) (*config.Configuration, error) {
 	var topConfiguration config.Configuration
 	if err := viper.Unmarshal(&topConfiguration); err != nil {
@@ -200,6 +204,11 @@ func main() {
 		false,
 		"Send log output to syslog instead of stderr (not available on Windows)",
 	)
+	showVersion := flag.Bool(
+		"version",
+		false,
+		"Show the version of the program when it was compiled",
+	)
 
 	flag.Usage = usage
 
@@ -219,6 +228,11 @@ func main() {
 		logrus.SetLevel(logrus.ErrorLevel)
 	default:
 		logrus.Fatalf("unknown logging level %q", *loglevel)
+	}
+
+	if *showVersion {
+		version()
+		return
 	}
 
 	if *useSyslog {
