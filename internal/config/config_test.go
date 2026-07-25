@@ -698,7 +698,7 @@ func TestBox_JSONOmitsInternalFields(t *testing.T) {
 	}
 
 	// Unmarshal to map to check fields
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(data, &result)
 	if err != nil {
 		t.Fatalf("json.Unmarshal() error = %v", err)

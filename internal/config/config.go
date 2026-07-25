@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"text/template"
 )
 
@@ -136,7 +137,7 @@ type IDLEEvent struct {
 func CompileTemplate(i string) error {
 	t, err := template.New("test").Parse(i)
 	if err != nil {
-		return err
+		return fmt.Errorf("config: %w", err)
 	}
 	buf := bytes.NewBuffer(nil)
 
@@ -145,35 +146,40 @@ func CompileTemplate(i string) error {
 		Mailbox: "Inbox",
 	}
 
-	return t.Execute(buf, input)
+	if err := t.Execute(buf, &input); err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	return nil
 }
 
 // LegacyConverter converts old format configuration to new format
 func LegacyConverter(conf ConfigurationLegacy) []NotifyConfig {
-	var r []NotifyConfig
-	var c NotifyConfig
-	c.Host = conf.Host
-	c.HostCMD = conf.HostCMD
-	c.Port = conf.Port
-	c.TLS = conf.TLS
-	c.TLSOptions = conf.TLSOptions
-	c.Username = conf.Username
-	c.UsernameCMD = conf.UsernameCMD
-	c.Password = conf.Password
-	c.PasswordCMD = conf.PasswordCMD
-	c.XOAuth2 = conf.XOAuth2
-	c.OnNewMail = conf.OnNewMail
-	c.OnNewMailPost = conf.OnNewMailPost
-	c.OnChangedMail = conf.OnChangedMail
-	c.OnChangedMailPost = conf.OnChangedMailPost
-	c.OnDeletedMail = conf.OnDeletedMail
-	c.OnDeletedMailPost = conf.OnDeletedMailPost
-	c.IDLELogoutTimeout = conf.IDLELogoutTimeout
-	c.EnableIDCommand = conf.EnableIDCommand
-	for _, mailbox := range conf.Boxes {
-		c.Boxes = append(c.Boxes, Box{Mailbox: mailbox})
+	c := NotifyConfig{
+		Host:              conf.Host,
+		HostCMD:           conf.HostCMD,
+		Port:              conf.Port,
+		TLS:               conf.TLS,
+		TLSOptions:        conf.TLSOptions,
+		Username:          conf.Username,
+		UsernameCMD:       conf.UsernameCMD,
+		Password:          conf.Password,
+		PasswordCMD:       conf.PasswordCMD,
+		XOAuth2:           conf.XOAuth2,
+		OnNewMail:         conf.OnNewMail,
+		OnNewMailPost:     conf.OnNewMailPost,
+		OnChangedMail:     conf.OnChangedMail,
+		OnChangedMailPost: conf.OnChangedMailPost,
+		OnDeletedMail:     conf.OnDeletedMail,
+		OnDeletedMailPost: conf.OnDeletedMailPost,
+		IDLELogoutTimeout: conf.IDLELogoutTimeout,
+		EnableIDCommand:   conf.EnableIDCommand,
 	}
-	return append(r, c)
+
+	c.Boxes = make([]Box, len(conf.Boxes))
+	for i, mailbox := range conf.Boxes {
+		c.Boxes[i] = Box{Mailbox: mailbox}
+	}
+	return []NotifyConfig{c}
 }
 
 // SetFromConfig inherits config values to Box and validates templates
