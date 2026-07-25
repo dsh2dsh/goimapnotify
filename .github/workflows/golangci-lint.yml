@@ -1,0 +1,36 @@
+name: "golangci-lint"
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+
+permissions:
+  contents: "read"
+  # Optional: allow read access to pull request. Use with `only-new-issues`
+  # option.
+  # pull-requests: read
+
+jobs:
+  "golangci":
+    name: "lint"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v7.0.0"
+      - uses: "actions/setup-go@v7"
+        with:
+          go-version-file: 'go.mod'
+      - name: "golangci-lint"
+        uses: "golangci/golangci-lint-action@v9.3.0"
+        with:
+          # Require: The version of golangci-lint to use.
+          #
+          # When `install-mode` is `binary` (default) the value can be v1.2 or
+          # v1.2.3 or `latest` to use the latest version.
+          #
+          # When `install-mode` is `goinstall` the value can be v1.2.3,
+          # `latest`, or the hash of a commit.
+          version: 'latest'
+
+          # The mode to install golangci-lint. It can be 'binary', 'goinstall',
+          # or 'none'. Default is "binary".
+          install-mode: "binary"
