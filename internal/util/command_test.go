@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 func TestPrepareCommand(t *testing.T) {

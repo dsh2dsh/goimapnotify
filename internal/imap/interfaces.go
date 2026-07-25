@@ -25,7 +25,7 @@ import (
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-sasl"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // IMAPClientInterface defines the methods required from an IMAP client.

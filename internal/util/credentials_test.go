@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"testing"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 func TestRetrievePasswordCmd(t *testing.T) {

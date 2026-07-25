@@ -1,6 +1,6 @@
-module gitlab.com/shackra/goimapnotify
+module github.com/dsh2dsh/goimapnotify
 
-go 1.23
+go 1.26
 
 require (
 	github.com/emersion/go-imap v1.2.1

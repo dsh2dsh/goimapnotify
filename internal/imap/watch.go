@@ -23,7 +23,7 @@ import (
 	"github.com/emersion/go-imap/client"
 	"github.com/sirupsen/logrus"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // IDLEEvent models an IDLE event

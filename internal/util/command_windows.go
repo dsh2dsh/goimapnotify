@@ -27,7 +27,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // PrepareCommand parses a string and returns a command executable by Go

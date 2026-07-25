@@ -32,8 +32,8 @@ import (
 	"github.com/emersion/go-sasl"
 	"github.com/sirupsen/logrus"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
-	"gitlab.com/shackra/goimapnotify/internal/util"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 // Version is set at build time

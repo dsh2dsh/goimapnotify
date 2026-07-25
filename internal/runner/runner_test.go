@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
-	"gitlab.com/shackra/goimapnotify/internal/imap"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/imap"
 )
 
 // TestNewRunningBox tests the NewRunningBox constructor

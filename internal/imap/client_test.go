@@ -26,7 +26,7 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-sasl"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // MockIMAPClient is a mock implementation of IMAPClientInterface for testing

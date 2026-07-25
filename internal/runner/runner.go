@@ -26,9 +26,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"gitlab.com/shackra/goimapnotify/internal/config"
-	"gitlab.com/shackra/goimapnotify/internal/imap"
-	"gitlab.com/shackra/goimapnotify/internal/util"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/imap"
+	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 // RunningBox manages command scheduling and execution
