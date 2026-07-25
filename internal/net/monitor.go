@@ -17,8 +17,8 @@ package net
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -72,11 +72,7 @@ func NewNetworkMonitor(
 
 // Start launches the monitor goroutine
 func (m *NetworkMonitor) Start(wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		m.run()
-	}()
+	wg.Go(m.run)
 }
 
 // run is the main polling loop
@@ -112,7 +108,7 @@ func (m *NetworkMonitor) probeAll() bool {
 
 	reachable := 0
 	for _, hp := range m.hosts {
-		addr := net.JoinHostPort(hp.Host, fmt.Sprintf("%d", hp.Port))
+		addr := net.JoinHostPort(hp.Host, strconv.Itoa(hp.Port))
 		conn, err := net.DialTimeout("tcp", addr, m.timeout)
 		if err != nil {
 			logrus.WithField("host", addr).WithError(err).Debug("network probe failed")
