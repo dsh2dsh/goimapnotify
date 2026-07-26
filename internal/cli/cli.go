@@ -30,7 +30,6 @@ import (
 
 	goimap "github.com/emersion/go-imap"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
@@ -49,15 +48,6 @@ func init() {
 	imap.Version = gittag
 }
 
-func getDefaultConfigPath() string {
-	home := os.Getenv("XDG_CONFIG_HOME")
-	if home == "" {
-		return filepath.Join(os.Getenv("HOME"), ".config", "goimapnotify")
-	}
-
-	return filepath.Join(home, "goimapnotify")
-}
-
 func usage() {
 	_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
 	flag.PrintDefaults()
@@ -69,116 +59,16 @@ func version() {
 	_, _ = fmt.Fprintln(flag.CommandLine.Output(), imap.Version)
 }
 
-func loadConfiguration(path string, retries int) (*config.Configuration, error) {
-	var topConfiguration config.Configuration
-	if err := viper.Unmarshal(&topConfiguration); err != nil {
-		return nil, fmt.Errorf("can't parse the configuration: %q, error: %w", path, err)
-	}
-
-	if topConfiguration.Configurations == nil {
-		var legacy config.ConfigurationLegacy
-		if err := viper.UnmarshalExact(&legacy); err != nil {
-			return nil, fmt.Errorf(
-				"can't parse the configuration in 'legacy' format: %s, error: %w",
-				path,
-				err,
-			)
-		}
-
-		logrus.Info("legacy format configuration detected")
-		topConfiguration.Configurations = config.LegacyConverter(legacy)
-	}
-
-	if len(topConfiguration.Configurations) > 0 &&
-		(topConfiguration.Configurations[0].Host == "" && topConfiguration.Configurations[0].HostCMD == "") {
-		return nil, fmt.Errorf(
-			"configuration file %q is empty or have invalid configuration format",
-			path,
-		)
-	}
-
-	for account := range topConfiguration.Configurations {
-		topConfiguration.Configurations[account] = util.RetrieveCmd(
-			topConfiguration.Configurations[account],
-		)
-		if topConfiguration.Configurations[account].Alias == "" {
-			topConfiguration.Configurations[account].Alias = topConfiguration.Configurations[account].Username
-		}
-		if logrus.GetLevel() == logrus.DebugLevel {
-			topConfiguration.Configurations[account].Alias = "<?>"
-		}
-
-		conf := topConfiguration.Configurations[account]
-
-		// If there is no mailboxes, watch over all mailboxes of the account
-		if len(conf.Boxes) == 0 {
-			client, err := imap.NewIMAPIDLEClient(conf, retries)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"account %q, failed to create IMAP client, error: %w",
-					conf.Username,
-					err,
-				)
-			}
-			defer client.Logout()
-
-			// NOTE(shackra): Having to do this is really disgusting, v2 offers a better way for listing mailboxes. I should consider updating.
-			ch := make(chan *goimap.MailboxInfo)
-			go func() {
-				err := client.List("", "*", ch)
-				if err != nil {
-					logrus.WithError(err).
-						WithField("account", conf.Username).
-						Fatal("failed to list all mailboxes")
-				}
-			}()
-
-			for mailbox := range ch {
-				// Ignore mailboxes with attributes `\All` and `\Noselect`
-				if slices.Contains(mailbox.Attributes, "\\All") ||
-					slices.Contains(mailbox.Attributes, "\\Noselect") {
-					continue
-				}
-
-				box, err := config.SetFromConfig(conf, config.Box{
-					Mailbox: mailbox.Name,
-				})
-				if err != nil {
-					logrus.WithError(err).Fatal("template is invalid")
-				}
-				topConfiguration.Configurations[account].Boxes = append(
-					topConfiguration.Configurations[account].Boxes,
-					box,
-				)
-			}
-		} else {
-			// replace all listed mailboxes with the same mailboxes carrying values from the configuration
-			for mailbox := range topConfiguration.Configurations[account].Boxes {
-				box, err := config.SetFromConfig(
-					conf,
-					topConfiguration.Configurations[account].Boxes[mailbox],
-				)
-				if err != nil {
-					logrus.WithError(err).Fatal("template is invalid")
-				}
-				topConfiguration.Configurations[account].Boxes[mailbox] = box
-			}
-		}
-	}
-
-	return &topConfiguration, nil
-}
-
 func Run() {
-	// imap.DefaultLogMask = imap.LogConn | imap.LogRaw
-	fileconf := flag.String(
-		"conf",
-		filepath.Join(
-			getDefaultConfigPath(),
-			"goimapnotify."+viper.SupportedExts[2],
-		),
-		"Configuration file, supported formats: json, yaml/yml, toml",
-	)
+	configPath, err := defaultConfigPath()
+	if err != nil {
+		logrus.Fatal(err.Error())
+	}
+
+	fileconf := flag.String("conf",
+		filepath.Join(configPath, "goimapnotify.yaml"),
+		"Configuration file")
+
 	list := flag.Bool("list", false, "List all mailboxes and exit")
 	loglevel := flag.String(
 		"log-level",
@@ -239,22 +129,17 @@ func Run() {
 
 	logrus.Infof("ℹ Running commit %s, tag %s, branch %s", commit, gittag, branch)
 
-	viper.SetConfigFile(*fileconf)
-	if err := viper.ReadInConfig(); err != nil {
-		logrus.WithError(err).Fatalf("can't read file: %q", *fileconf)
+	topConfig, err := loadConfiguration(*fileconf, *dialRetries)
+	if err != nil {
+		logrus.WithError(err).Fatalf("can't load the configuration %q", *fileconf)
 	}
+	logrus.Debugf("configuration loaded successfully: %q", *fileconf)
 
 	idleChan := make(chan imap.IDLEEvent)
 	queueChan := make(chan imap.IDLEEvent, 100)
 	boxChan := make(chan imap.BoxEvent, 1)
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
-
-	topConfig, err := loadConfiguration(*fileconf, *dialRetries)
-	if err != nil {
-		logrus.WithError(err).Fatalf("can't load the configuration %q", *fileconf)
-	}
-	logrus.Debugf("configuration loaded successfully: %q", *fileconf)
 
 	running := runner.NewRunningBox(debug, *wait)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -359,6 +244,90 @@ func Run() {
 	wg.Wait()
 	util.PrintDonate(os.Stderr, 11)
 	logrus.Info("bye")
+}
+
+func defaultConfigPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("config: unable get user config dir: %w", err)
+	}
+	return filepath.Join(dir, "goimapnotify"), nil
+}
+
+func loadConfiguration(filename string, retries int,
+) (*config.Configuration, error) {
+	cfg, err := config.LoadYAML(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range cfg.Configurations {
+		cfg.Configurations[i] = util.RetrieveCmd(cfg.Configurations[i])
+		if cfg.Configurations[i].Alias == "" {
+			cfg.Configurations[i].Alias = cfg.Configurations[i].Username
+		}
+		if logrus.GetLevel() == logrus.DebugLevel {
+			cfg.Configurations[i].Alias = "<?>"
+		}
+
+		conf := cfg.Configurations[i]
+
+		// If there is no mailboxes, watch over all mailboxes of the account
+		if len(conf.Boxes) == 0 {
+			client, err := imap.NewIMAPIDLEClient(conf, retries)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"account %q, failed to create IMAP client, error: %w",
+					conf.Username,
+					err,
+				)
+			}
+			defer client.Logout()
+
+			// NOTE(shackra): Having to do this is really disgusting, v2 offers a better way for listing mailboxes. I should consider updating.
+			ch := make(chan *goimap.MailboxInfo)
+			go func() {
+				err := client.List("", "*", ch)
+				if err != nil {
+					logrus.WithError(err).
+						WithField("account", conf.Username).
+						Fatal("failed to list all mailboxes")
+				}
+			}()
+
+			for mailbox := range ch {
+				// Ignore mailboxes with attributes `\All` and `\Noselect`
+				if slices.Contains(mailbox.Attributes, "\\All") ||
+					slices.Contains(mailbox.Attributes, "\\Noselect") {
+					continue
+				}
+
+				box, err := config.SetFromConfig(conf, config.Box{
+					Mailbox: mailbox.Name,
+				})
+				if err != nil {
+					logrus.WithError(err).Fatal("template is invalid")
+				}
+				cfg.Configurations[i].Boxes = append(
+					cfg.Configurations[i].Boxes,
+					box,
+				)
+			}
+		} else {
+			// replace all listed mailboxes with the same mailboxes carrying values from the configuration
+			for mailbox := range cfg.Configurations[i].Boxes {
+				box, err := config.SetFromConfig(
+					conf,
+					cfg.Configurations[i].Boxes[mailbox],
+				)
+				if err != nil {
+					logrus.WithError(err).Fatal("template is invalid")
+				}
+				cfg.Configurations[i].Boxes[mailbox] = box
+			}
+		}
+	}
+	return cfg, nil
 }
 
 func reconnectWatcher(

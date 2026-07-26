@@ -150,36 +150,6 @@ func CompileTemplate(i string) error {
 	return nil
 }
 
-// LegacyConverter converts old format configuration to new format
-func LegacyConverter(conf ConfigurationLegacy) []NotifyConfig {
-	c := NotifyConfig{
-		Host:              conf.Host,
-		HostCMD:           conf.HostCMD,
-		Port:              conf.Port,
-		TLS:               conf.TLS,
-		TLSOptions:        conf.TLSOptions,
-		Username:          conf.Username,
-		UsernameCMD:       conf.UsernameCMD,
-		Password:          conf.Password,
-		PasswordCMD:       conf.PasswordCMD,
-		XOAuth2:           conf.XOAuth2,
-		OnNewMail:         conf.OnNewMail,
-		OnNewMailPost:     conf.OnNewMailPost,
-		OnChangedMail:     conf.OnChangedMail,
-		OnChangedMailPost: conf.OnChangedMailPost,
-		OnDeletedMail:     conf.OnDeletedMail,
-		OnDeletedMailPost: conf.OnDeletedMailPost,
-		IDLELogoutTimeout: conf.IDLELogoutTimeout,
-		EnableIDCommand:   conf.EnableIDCommand,
-	}
-
-	c.Boxes = make([]Box, len(conf.Boxes))
-	for i, mailbox := range conf.Boxes {
-		c.Boxes[i] = Box{Mailbox: mailbox}
-	}
-	return []NotifyConfig{c}
-}
-
 // SetFromConfig inherits config values to Box and validates templates
 func SetFromConfig(conf NotifyConfig, box Box) (Box, error) {
 	if box.OnNewMail == "" {

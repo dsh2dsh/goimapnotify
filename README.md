@@ -20,6 +20,11 @@ testing.
   and enabled by default. It really looks like a DDOS. By default it connects to
   `archlinux.org:80` and `ubuntu.com:80` every 30 seconds.
 
+* Support only YAML configuration file
+
+  Support of `JSON` or `TOML` removed. Default configuration file is
+  `$XDG_CONFIG_HOME/goimapnotify/goimapnotify.yaml`.
+
 ## Configuration
 
 This application is mostly compatible with the configuration of
@@ -147,7 +152,7 @@ go install github.com/dsh2dsh/goimapnotify@latest
 ```
 Usage of goimapnotify:
   -conf string
-        Configuration file, supported formats: json, yaml/yml, toml (default "$XDG_CONFIG_HOME/goimapnotify/goimapnotify.yaml")
+        Configuration file (default "$XDG_CONFIG_HOME/goimapnotify/goimapnotify.yaml")
   -dial-retry-attempts int
         Number of attempts when connecting to an IMAP server, using exponential backoff (default 5)
   -list
