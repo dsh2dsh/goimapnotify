@@ -2,8 +2,21 @@
 ## [Unreleased]
 
 
+<a name="2.5.7"></a>
+## [2.5.7] - 2026-07-25
+### Changes
+- Update README.md with a important message
+
+### Features
+- Print the version of goimapnotify with `-version`
+
+### Fixes
+- Update flake.lock and flake.nix
+- Typo in shield badge on README.md
+
+
 <a name="2.5.6"></a>
-## [2.5.6] - 2026-06-08
+## [2.5.6] - 2026-06-27
 ### Features
 - Detect network changes and reconnect resiliently
 - Add `--syslog` flag to redirect logs to syslog
@@ -159,7 +172,8 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.6...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.7...HEAD
+[2.5.7]: https://gitlab.com/shackra/goimapnotify/compare/2.5.6...2.5.7
 [2.5.6]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...2.5.6
 [2.5.5]: https://gitlab.com/shackra/goimapnotify/compare/2.5.4...2.5.5
 [2.5.4]: https://gitlab.com/shackra/goimapnotify/compare/2.5.3...2.5.4
