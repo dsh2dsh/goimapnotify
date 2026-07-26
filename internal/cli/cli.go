@@ -17,7 +17,6 @@ package cli
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -30,6 +29,7 @@ import (
 
 	goimap "github.com/emersion/go-imap"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
@@ -38,69 +38,76 @@ import (
 )
 
 var (
-	commit string
-	gittag string
-	branch string
+	commit, gittag, branch string
+
+	flagConfig   string
+	flagLogLevel string
+	flagWait     int
+	flagRetries  int
+	flagSyslog   bool
+	flagList     bool
+
+	debug     bool
+	topConfig *config.Configuration
 )
+
+var Cmd = cobra.Command{
+	Use:     "goimapnotify",
+	Short:   "goimapnotify executes scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE.",
+	Args:    cobra.ExactArgs(0),
+	Version: gittag,
+
+	PersistentPreRunE: persistentPreRunE,
+
+	RunE: func(cmd *cobra.Command, args []string) error { return Run() },
+}
 
 func init() {
 	// Set the version for the imap package
 	imap.Version = gittag
+
+	Cmd.PersistentFlags().StringVarP(&flagLogLevel, "log-level", "l", "info",
+		"change the logging level (error|warn|info|debug)")
+
+	Cmd.PersistentFlags().IntVarP(&flagWait, "wait", "w", 1,
+		"delay in seconds between the IDLE event and the execution of the scripts")
+
+	Cmd.PersistentFlags().IntVarP(&flagRetries, "dial-retry-attempts", "r", 5,
+		"number of attempts when connecting to an IMAP server, using exponential backoff")
+
+	Cmd.PersistentFlags().BoolVarP(&flagSyslog, "syslog", "s", false,
+		"send log output to syslog instead of stderr")
+
+	Cmd.Flags().BoolVar(&flagList, "list", false, "List all mailboxes and exit")
+	Cmd.AddCommand(&listCmd)
 }
 
-func usage() {
-	_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
-	flag.PrintDefaults()
-}
-
-func version() {
-	_, _ = fmt.Fprintln(flag.CommandLine.Output(), imap.Version)
-}
-
-func Run() {
+func Execute() {
 	configPath, err := defaultConfigPath()
-	if err != nil {
-		logrus.Fatal(err.Error())
+	cobra.CheckErr(err)
+
+	Cmd.PersistentFlags().StringVarP(&flagConfig, "conf", "c",
+		filepath.Join(configPath, "goimapnotify.yaml"), "Configuration file")
+
+	if err := Cmd.Execute(); err != nil {
+		os.Exit(1)
 	}
+}
 
-	fileconf := flag.String("conf",
-		filepath.Join(configPath, "goimapnotify.yaml"),
-		"Configuration file")
+func defaultConfigPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("config: unable get user config dir: %w", err)
+	}
+	return filepath.Join(dir, "goimapnotify"), nil
+}
 
-	list := flag.Bool("list", false, "List all mailboxes and exit")
-	loglevel := flag.String(
-		"log-level",
-		"info",
-		"Change the logging level; possible values are: error, warn, info, debug",
-	)
-	wait := flag.Int(
-		"wait",
-		1,
-		"Delay in seconds between the IDLE event and the execution of the scripts",
-	)
-	dialRetries := flag.Int(
-		"dial-retry-attempts",
-		5,
-		"Number of attempts when connecting to an IMAP server, using exponential backoff",
-	)
-	useSyslog := flag.Bool(
-		"syslog",
-		false,
-		"Send log output to syslog instead of stderr",
-	)
-	showVersion := flag.Bool(
-		"version",
-		false,
-		"Show the version of the program when it was compiled",
-	)
+func persistentPreRunE(cmd *cobra.Command, args []string) error {
+	// Don't show usage on app errors.
+	// https://github.com/spf13/cobra/issues/340#issuecomment-378726225
+	cmd.SilenceUsage = true
 
-	flag.Usage = usage
-
-	flag.Parse()
-
-	debug := false
-
-	switch strings.ToLower(*loglevel) {
+	switch strings.ToLower(flagLogLevel) {
 	case "debug":
 		logrus.SetLevel(logrus.DebugLevel)
 		debug = true
@@ -111,27 +118,27 @@ func Run() {
 	case "error":
 		logrus.SetLevel(logrus.ErrorLevel)
 	default:
-		logrus.Fatalf("unknown logging level %q", *loglevel)
+		return fmt.Errorf("invalid --log-level: %s (want error|warn|info|debug)",
+			flagLogLevel)
 	}
 
-	if *showVersion {
-		version()
-		return
-	}
-
-	if *useSyslog {
+	if flagSyslog {
 		if err := enableSyslog(); err != nil {
-			logrus.WithError(err).Fatal("failed to enable syslog")
+			return err
 		}
 	}
 
-	logrus.Infof("ℹ Running commit %s, tag %s, branch %s", commit, gittag, branch)
-
-	topConfig, err := loadConfiguration(*fileconf, *dialRetries)
+	cfg, err := loadConfiguration(flagConfig, flagRetries)
 	if err != nil {
-		logrus.WithError(err).Fatalf("can't load the configuration %q", *fileconf)
+		return fmt.Errorf("can't load the configuration %q: %w", flagConfig, err)
 	}
-	logrus.Debugf("configuration loaded successfully: %q", *fileconf)
+	topConfig = cfg
+	logrus.Debugf("configuration loaded successfully: %q", flagConfig)
+	return nil
+}
+
+func Run() error {
+	logrus.Infof("ℹ Running commit %s, tag %s, branch %s", commit, gittag, branch)
 
 	idleChan := make(chan imap.IDLEEvent)
 	queueChan := make(chan imap.IDLEEvent, 100)
@@ -139,71 +146,46 @@ func Run() {
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
 
-	running := runner.NewRunningBox(debug, *wait)
+	running := runner.NewRunningBox(debug, flagWait)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	wg := &sync.WaitGroup{}
 
-	if *list {
-		for _, account := range topConfig.Configurations {
-			client, err := imap.NewClient(account, *dialRetries)
-			if err != nil {
-				logrus.WithError(err).
-					WithField("account", account.Alias).
-					Fatal("something went wrong creating IMAP client")
-			}
-			defer client.Logout()
-
-			mailboxCount, err := util.PrintDelimiter(client)
-			if err != nil {
-				logrus.WithField("alias", account.Alias).
-					WithError(err).
-					Warning("listing mailboxes finished with error")
-			}
-			logrus.WithField("account", account.Alias).Info("walking through the account mailboxes")
-			err = util.WalkMailbox(client, "", 0, mailboxCount)
-			if err != nil {
-				logrus.WithField("account", account.Alias).
-					WithError(err).
-					Fatal("something went wrong while walking on the account listing all mailboxes")
-			}
-		}
+	if flagList {
+		return listMailboxes(topConfig)
 	}
 
 	// Watch mailboxes events
 	// This kick-starts the watching
-	idleForever := !*list
-	if idleForever {
-		/* I really doubt it that creating a new client for
-		   each mailbox that we want to listen for events is
-		   healthy, or elegant... but, if the connection
-		   fails, what the program does right now is exactly
-		   that: it creates a new client for that failing
-		   mailbox only, lol!
-		*/
-		for _, account := range topConfig.Configurations {
-			for _, mailbox := range account.Boxes {
-				key := account.Alias + mailbox.Mailbox
-				running.Config[key] = account
+	//
+	// I really doubt it that creating a new client for each mailbox that we want
+	// to listen for events is healthy, or elegant... but, if the connection
+	// fails, what the program does right now is exactly that: it creates a new
+	// client for that failing mailbox only, lol!
 
-				client, err := imap.NewIMAPIDLEClient(account, *dialRetries)
-				if err != nil {
-					logrus.WithError(err).
-						WithField("account", account.Alias).
-						Warn("Initial connection failed, retrying in background")
-					mailbox.Alias = account.Alias
-					wg.Add(1)
-					go reconnectWatcher(
-						imap.BoxEvent{UniqID: key, Mailbox: mailbox},
-						account, idleChan, boxChan, quitChan, wg, *dialRetries,
-					)
-					continue
-				}
-				imap.NewWatchBox(client, account, mailbox, idleChan, boxChan, quitChan, wg)
+	var wg sync.WaitGroup
+	for _, account := range topConfig.Configurations {
+		for _, mailbox := range account.Boxes {
+			key := account.Alias + mailbox.Mailbox
+			running.Config[key] = account
+
+			client, err := imap.NewIMAPIDLEClient(account, flagRetries)
+			if err != nil {
+				logrus.WithError(err).
+					WithField("account", account.Alias).
+					Warn("Initial connection failed, retrying in background")
+				mailbox.Alias = account.Alias
+				wg.Add(1)
+				go reconnectWatcher(
+					imap.BoxEvent{UniqID: key, Mailbox: mailbox},
+					account, idleChan, boxChan, quitChan, &wg, flagRetries,
+				)
+				continue
 			}
+			imap.NewWatchBox(client, account, mailbox, idleChan, boxChan, quitChan, &wg)
 		}
 	}
 
-	for idleForever {
+idleLoop:
+	for {
 		select {
 		case boxEvent := <-boxChan:
 			l := logrus.WithField("alias", boxEvent.Mailbox.Alias).
@@ -217,14 +199,14 @@ func Run() {
 				idleChan,
 				boxChan,
 				quitChan,
-				wg,
-				*dialRetries,
+				&wg,
+				flagRetries,
 			)
 		case <-quit:
 			// OS asked nicely to close, we ask our
 			// goroutines to do the same
 			close(quitChan)
-			idleForever = false
+			break idleLoop
 		case idleEvent := <-idleChan:
 			wg.Go(func() { running.Schedule(idleEvent, quitChan, queueChan) })
 		case event := <-queueChan:
@@ -238,17 +220,11 @@ func Run() {
 			}
 		}
 	}
+
 	logrus.Info("waiting other goroutines to stop...")
 	wg.Wait()
 	logrus.Info("bye")
-}
-
-func defaultConfigPath() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("config: unable get user config dir: %w", err)
-	}
-	return filepath.Join(dir, "goimapnotify"), nil
+	return nil
 }
 
 func loadConfiguration(filename string, retries int,
