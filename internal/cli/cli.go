@@ -69,7 +69,7 @@ func usage() {
 }
 
 func version() {
-	fmt.Fprintln(flag.CommandLine.Output(), imap.Version)
+	_, _ = fmt.Fprintln(flag.CommandLine.Output(), imap.Version)
 }
 
 func loadConfiguration(path string, retries int) (*config.Configuration, error) {
