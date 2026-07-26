@@ -47,6 +47,7 @@
               path = ./.;
               name = "source";
             };
+            excludes = [ "vendor/" ];
             hooks = {
               nil.enable = true;
 
