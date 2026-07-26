@@ -51,8 +51,6 @@ func init() {
 func usage() {
 	_, _ = fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
 	flag.PrintDefaults()
-	msg := util.DonateMessage(8)
-	_, _ = fmt.Fprint(flag.CommandLine.Output(), "\n"+msg)
 }
 
 func version() {
@@ -242,7 +240,6 @@ func Run() {
 	}
 	logrus.Info("waiting other goroutines to stop...")
 	wg.Wait()
-	util.PrintDonate(os.Stderr, 11)
 	logrus.Info("bye")
 }
 
