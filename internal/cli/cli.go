@@ -88,7 +88,7 @@ func Run() {
 	useSyslog := flag.Bool(
 		"syslog",
 		false,
-		"Send log output to syslog instead of stderr (not available on Windows)",
+		"Send log output to syslog instead of stderr",
 	)
 	showVersion := flag.Bool(
 		"version",
@@ -122,7 +122,7 @@ func Run() {
 	}
 
 	if *useSyslog {
-		if err := util.EnableSyslog(); err != nil {
+		if err := enableSyslog(); err != nil {
 			logrus.WithError(err).Fatal("failed to enable syslog")
 		}
 	}
