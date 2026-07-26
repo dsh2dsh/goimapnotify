@@ -19,12 +19,10 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -36,7 +34,6 @@ import (
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
-	netmon "github.com/dsh2dsh/goimapnotify/internal/net"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
@@ -323,86 +320,11 @@ func Run() {
 		}
 	}
 
-	// Start network monitor if configured
-	var netChan chan netmon.NetworkEvent
-	checkInterval := topConfig.NetworkCheckInterval
-	if checkInterval == 0 {
-		checkInterval = 30 // default 30 seconds
-	}
-	if checkInterval > 0 {
-		netChan = make(chan netmon.NetworkEvent, 1)
-		var connectivityAddrs []string
-		if len(topConfig.ConnectivityHosts) > 0 {
-			connectivityAddrs = topConfig.ConnectivityHosts
-		} else {
-			connectivityAddrs = []string{"archlinux.org:80", "ubuntu.com:80"}
-		}
-		hosts := make([]netmon.HostPort, 0, len(connectivityAddrs))
-		for _, addr := range connectivityAddrs {
-			h, portStr, err := net.SplitHostPort(addr)
-			if err != nil {
-				logrus.WithError(err).Warnf("Invalid connectivityHosts entry %q, skipping", addr)
-				continue
-			}
-			port, err := strconv.Atoi(portStr)
-			if err != nil {
-				logrus.WithError(err).
-					Warnf("Invalid port in connectivityHosts entry %q, skipping", addr)
-				continue
-			}
-			hosts = append(hosts, netmon.HostPort{Host: h, Port: port})
-		}
-		monitor := netmon.NewNetworkMonitor(
-			hosts,
-			time.Duration(checkInterval)*time.Second,
-			5*time.Second,
-			netChan,
-			quitChan,
-		)
-		monitor.Start(wg)
-		logrus.Infof("Network monitor started, checking every %d seconds", checkInterval)
-	}
-
-	var networkDown bool
-	var pendingReconnects []imap.BoxEvent
-
 	for idleForever {
 		select {
-		case netEvent := <-netChan:
-			switch netEvent.State {
-			case netmon.NetworkDown:
-				networkDown = true
-			case netmon.NetworkUp:
-				networkDown = false
-				if len(pendingReconnects) > 0 {
-					logrus.Infof(
-						"Network restored, reconnecting %d watcher(s)",
-						len(pendingReconnects),
-					)
-					for _, ev := range pendingReconnects {
-						key := ev.Mailbox.Alias + ev.Mailbox.Mailbox
-						wg.Add(1)
-						go reconnectWatcher(
-							ev,
-							running.Config[key],
-							idleChan,
-							boxChan,
-							quitChan,
-							wg,
-							*dialRetries,
-						)
-					}
-					pendingReconnects = nil
-				}
-			}
 		case boxEvent := <-boxChan:
 			l := logrus.WithField("alias", boxEvent.Mailbox.Alias).
 				WithField("mailbox", boxEvent.Mailbox.Mailbox)
-			if networkDown {
-				l.Info("Watcher stopped, deferring reconnection until network is restored")
-				pendingReconnects = append(pendingReconnects, boxEvent)
-				continue
-			}
 			l.Info("Restarting watcher for mailbox")
 			key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
 			wg.Add(1)
@@ -421,10 +343,7 @@ func Run() {
 			close(quitChan)
 			idleForever = false
 		case idleEvent := <-idleChan:
-			wg.Go(func() {
-				defer wg.Done()
-				running.Schedule(idleEvent, quitChan, queueChan)
-			})
+			wg.Go(func() { running.Schedule(idleEvent, quitChan, queueChan) })
 		case event := <-queueChan:
 			wg.Add(1)
 			err := running.Run(event)

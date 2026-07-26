@@ -12,11 +12,21 @@ Current FreeBSD port is
 Keep in mind, sometimes it is a development version of this project, for
 testing.
 
-This application is mostly compatible with the configuration of [imapnotify made
-with Python](https://github.com/a-sk/python-imapnotify) (be sure to change
-`password_eval` to `passwordCMD`, see [issue
-#3](https://gitlab.com/shackra/goimapnotify/issues/3)), the following are all
-options available for the configuration:
+## Changes from [upstream](https://gitlab.com/shackra/goimapnotify):
+
+* Delete weird undocumented network change detector
+
+  It was added by upstream in commit 6264fa1b0471fc50a1f19567e24b97b8b090e591
+  and enabled by default. It really looks like a DDOS. By default it connects to
+  `archlinux.org:80` and `ubuntu.com:80` every 30 seconds.
+
+## Configuration
+
+This application is mostly compatible with the configuration of
+[imapnotify made with Python](https://github.com/a-sk/python-imapnotify)
+(be sure to change `password_eval` to `passwordCMD`, see
+[issue #3](https://gitlab.com/shackra/goimapnotify/issues/3)),
+the following are all options available for the configuration:
 
 ```yaml
 configurations:

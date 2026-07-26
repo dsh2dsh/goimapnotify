@@ -49,9 +49,7 @@ func (e EventType) String() string {
 
 // Configuration holds the top-level configuration
 type Configuration struct {
-	Configurations       []NotifyConfig `json:"configurations"       yaml:"configurations"`
-	NetworkCheckInterval int            `json:"networkCheckInterval" yaml:"networkCheckInterval"`
-	ConnectivityHosts    []string       `json:"connectivityHosts"    yaml:"connectivityHosts"`
+	Configurations []NotifyConfig `yaml:"configurations" json:"configurations"`
 }
 
 // ConfigurationLegacy holds the old configuration format
