@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -264,7 +263,7 @@ func loadConfiguration(filename string, retries int,
 		}
 
 		// If there is no mailboxes, watch over all mailboxes of the account
-		client, err := imap.NewIDLE(*conf, retries)
+		client, err := imap.New(*conf, retries)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"account %q, failed to create IMAP client, error: %w",
@@ -285,11 +284,13 @@ func loadConfiguration(filename string, retries int,
 			}
 		}()
 
+	mailboxLoop:
 		for mailbox := range ch {
 			// Ignore mailboxes with attributes `\All` and `\Noselect`
-			if slices.Contains(mailbox.Attributes, "\\All") ||
-				slices.Contains(mailbox.Attributes, "\\Noselect") {
-				continue
+			for _, attr := range mailbox.Attributes {
+				if attr == "\\All" || attr == "\\Noselect" {
+					continue mailboxLoop
+				}
 			}
 
 			box := config.Box{Mailbox: mailbox.Name}
