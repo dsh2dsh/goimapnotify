@@ -1,3 +1,4 @@
+//go:generate mockery
 package imap
 
 // This file is part of goimapnotify
@@ -25,8 +26,6 @@ import (
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-sasl"
-
-	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // IMAPClientInterface defines the methods required from an IMAP client.
@@ -57,13 +56,6 @@ type IMAPDialer interface {
 	DialTLS(addr string, config *tls.Config) (IMAPClientInterface, error)
 }
 
-// IdleClientInterface defines the methods required from an IDLE client.
-// This interface allows for mocking IDLE functionality in tests.
-type IdleClientInterface interface {
-	// IdleWithFallback starts the IDLE command with a fallback to polling
-	IdleWithFallback(stop <-chan struct{}, pollInterval time.Duration) error
-}
-
 // WatchClientInterface defines the methods required for watching mailboxes.
 // This combines the IMAP client and IDLE client functionality needed by WatchMailBox.
 type WatchClientInterface interface {
@@ -76,14 +68,6 @@ type WatchClientInterface interface {
 	// SetUpdatesChannel sets the channel for receiving updates
 	SetUpdatesChannel(updates chan client.Update)
 }
-
-// ClientFactory is a function type that creates IMAP clients.
-// It allows dependency injection for testing purposes.
-type ClientFactory func(conf config.NotifyConfig, retries int) (IMAPClientInterface, error)
-
-// IdleClientFactory is a function type that creates IDLE-enabled IMAP clients.
-// It allows dependency injection for testing purposes.
-type IdleClientFactory func(client IMAPClientInterface) IdleClientInterface
 
 // defaultDialer implements IMAPDialer using the real go-imap client
 type defaultDialer struct{}

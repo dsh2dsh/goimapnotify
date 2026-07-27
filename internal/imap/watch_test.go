@@ -30,45 +30,28 @@ import (
 
 // MockWatchClient implements WatchClientInterface for testing
 type MockWatchClient struct {
-	SelectFunc           func(name string, readOnly bool) (*imap.MailboxStatus, error)
-	LoggedOutFunc        func() <-chan struct{}
-	IdleWithFallbackFunc func(stop <-chan struct{}, pollInterval time.Duration) error
-	SetUpdatesFunc       func(updates chan client.Update)
+	*MoqWatchClient
 
 	// Internal state
 	updates      chan client.Update
 	loggedOutCh  chan struct{}
-	selectCalls  []selectCallRecord
-	idleCalls    int
 	idleStopChan <-chan struct{}
 	mu           sync.Mutex
 }
 
-type selectCallRecord struct {
-	Name     string
-	ReadOnly bool
-}
-
 func NewMockWatchClient() *MockWatchClient {
 	return &MockWatchClient{
-		loggedOutCh: make(chan struct{}),
+		MoqWatchClient: &MoqWatchClient{},
+		loggedOutCh:    make(chan struct{}),
 	}
-}
-
-func (m *MockWatchClient) Select(name string, readOnly bool) (*imap.MailboxStatus, error) {
-	m.mu.Lock()
-	m.selectCalls = append(m.selectCalls, selectCallRecord{name, readOnly})
-	m.mu.Unlock()
-	if m.SelectFunc != nil {
-		return m.SelectFunc(name, readOnly)
-	}
-	return &imap.MailboxStatus{Messages: 0}, nil
 }
 
 func (m *MockWatchClient) LoggedOut() <-chan struct{} {
 	if m.LoggedOutFunc != nil {
-		return m.LoggedOutFunc()
+		return m.MoqWatchClient.LoggedOut()
 	}
+	m.MoqWatchClient.LoggedOut()
+
 	m.mu.Lock()
 	ch := m.loggedOutCh
 	m.mu.Unlock()
@@ -77,12 +60,14 @@ func (m *MockWatchClient) LoggedOut() <-chan struct{} {
 
 func (m *MockWatchClient) IdleWithFallback(stop <-chan struct{}, pollInterval time.Duration) error {
 	m.mu.Lock()
-	m.idleCalls++
 	m.idleStopChan = stop
 	m.mu.Unlock()
+
 	if m.IdleWithFallbackFunc != nil {
-		return m.IdleWithFallbackFunc(stop, pollInterval)
+		return m.MoqWatchClient.IdleWithFallback(stop, pollInterval)
 	}
+	m.MoqWatchClient.IdleWithFallback(stop, pollInterval)
+
 	// Block until stop is closed
 	<-stop
 	return nil
@@ -92,9 +77,7 @@ func (m *MockWatchClient) SetUpdatesChannel(updates chan client.Update) {
 	m.mu.Lock()
 	m.updates = updates
 	m.mu.Unlock()
-	if m.SetUpdatesFunc != nil {
-		m.SetUpdatesFunc(updates)
-	}
+	m.MoqWatchClient.SetUpdatesChannel(updates)
 }
 
 // SendUpdate sends an update through the updates channel

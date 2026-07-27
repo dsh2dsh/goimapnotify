@@ -19,7 +19,6 @@ package imap
 import (
 	"crypto/tls"
 	"errors"
-	"io"
 	"testing"
 	"time"
 
@@ -28,140 +27,6 @@ import (
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
-
-// MockIMAPClient is a mock implementation of IMAPClientInterface for testing
-type MockIMAPClient struct {
-	// Configurable behavior
-	LoginFunc        func(username, password string) error
-	AuthenticateFunc func(auth sasl.Client) error
-	SupportAuthFunc  func(mech string) (bool, error)
-	StartTLSFunc     func(config *tls.Config) error
-	SupportFunc      func(capability string) (bool, error)
-	LogoutFunc       func() error
-	LoggedOutFunc    func() <-chan struct{}
-	SelectFunc       func(name string, readOnly bool) (*imap.MailboxStatus, error)
-	SetDebugFunc     func(w io.Writer)
-
-	// Call tracking
-	LoginCalls        []loginCall
-	AuthenticateCalls []sasl.Client
-	SupportAuthCalls  []string
-	StartTLSCalls     int
-	SupportCalls      []string
-	LogoutCalls       int
-	SelectCalls       []selectCall
-	SetDebugCalls     int
-}
-
-type loginCall struct {
-	Username string
-	Password string
-}
-
-type selectCall struct {
-	Name     string
-	ReadOnly bool
-}
-
-func (m *MockIMAPClient) Login(username, password string) error {
-	m.LoginCalls = append(m.LoginCalls, loginCall{username, password})
-	if m.LoginFunc != nil {
-		return m.LoginFunc(username, password)
-	}
-	return nil
-}
-
-func (m *MockIMAPClient) Authenticate(auth sasl.Client) error {
-	m.AuthenticateCalls = append(m.AuthenticateCalls, auth)
-	if m.AuthenticateFunc != nil {
-		return m.AuthenticateFunc(auth)
-	}
-	return nil
-}
-
-func (m *MockIMAPClient) SupportAuth(mech string) (bool, error) {
-	m.SupportAuthCalls = append(m.SupportAuthCalls, mech)
-	if m.SupportAuthFunc != nil {
-		return m.SupportAuthFunc(mech)
-	}
-	return false, nil
-}
-
-func (m *MockIMAPClient) StartTLS(config *tls.Config) error {
-	m.StartTLSCalls++
-	if m.StartTLSFunc != nil {
-		return m.StartTLSFunc(config)
-	}
-	return nil
-}
-
-func (m *MockIMAPClient) Support(capability string) (bool, error) {
-	m.SupportCalls = append(m.SupportCalls, capability)
-	if m.SupportFunc != nil {
-		return m.SupportFunc(capability)
-	}
-	return false, nil
-}
-
-func (m *MockIMAPClient) Logout() error {
-	m.LogoutCalls++
-	if m.LogoutFunc != nil {
-		return m.LogoutFunc()
-	}
-	return nil
-}
-
-func (m *MockIMAPClient) LoggedOut() <-chan struct{} {
-	if m.LoggedOutFunc != nil {
-		return m.LoggedOutFunc()
-	}
-	return make(chan struct{})
-}
-
-func (m *MockIMAPClient) Select(name string, readOnly bool) (*imap.MailboxStatus, error) {
-	m.SelectCalls = append(m.SelectCalls, selectCall{name, readOnly})
-	if m.SelectFunc != nil {
-		return m.SelectFunc(name, readOnly)
-	}
-	return &imap.MailboxStatus{Messages: 0}, nil
-}
-
-func (m *MockIMAPClient) SetDebug(w io.Writer) {
-	m.SetDebugCalls++
-	if m.SetDebugFunc != nil {
-		m.SetDebugFunc(w)
-	}
-}
-
-// MockDialer is a mock implementation of IMAPDialer for testing
-type MockDialer struct {
-	DialFunc    func(addr string) (IMAPClientInterface, error)
-	DialTLSFunc func(addr string, config *tls.Config) (IMAPClientInterface, error)
-
-	DialCalls    []string
-	DialTLSCalls []dialTLSCall
-}
-
-type dialTLSCall struct {
-	Addr   string
-	Config *tls.Config
-}
-
-func (m *MockDialer) Dial(addr string) (IMAPClientInterface, error) {
-	m.DialCalls = append(m.DialCalls, addr)
-	if m.DialFunc != nil {
-		return m.DialFunc(addr)
-	}
-	return &MockIMAPClient{}, nil
-}
-
-func (m *MockDialer) DialTLS(addr string, config *tls.Config) (IMAPClientInterface, error) {
-	m.DialTLSCalls = append(m.DialTLSCalls, dialTLSCall{addr, config})
-	if m.DialTLSFunc != nil {
-		return m.DialTLSFunc(addr, config)
-	}
-	return &MockIMAPClient{}, nil
-}
 
 // TestVersion tests the Version variable
 func TestVersion(t *testing.T) {
@@ -178,12 +43,12 @@ func TestVersion(t *testing.T) {
 
 // TestMockIMAPClient_ImplementsInterface verifies the mock implements the interface
 func TestMockIMAPClient_ImplementsInterface(t *testing.T) {
-	var _ IMAPClientInterface = &MockIMAPClient{}
+	var _ IMAPClientInterface = &MoqIMAPClient{}
 }
 
 // TestMockDialer_ImplementsInterface verifies the mock dialer implements the interface
 func TestMockDialer_ImplementsInterface(t *testing.T) {
-	var _ IMAPDialer = &MockDialer{}
+	var _ IMAPDialer = &MoqIMAPDialer{}
 }
 
 // TestDefaultDialer tests that DefaultDialer returns a valid dialer
@@ -199,8 +64,8 @@ func TestNewClientWithDialer(t *testing.T) {
 	tests := []struct {
 		name        string
 		conf        config.NotifyConfig
-		setupDialer func() *MockDialer
-		setupClient func() *MockIMAPClient
+		setupDialer func() *MoqIMAPDialer
+		setupClient func() *MoqIMAPClient
 		wantErr     bool
 		errContains string
 	}{
@@ -213,11 +78,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Username: "user@example.com",
 				Password: "password123",
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{}
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{}
 			},
 			wantErr: false,
 		},
@@ -234,11 +99,11 @@ func TestNewClientWithDialer(t *testing.T) {
 					STARTTLS:           false,
 				},
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{}
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{}
 			},
 			wantErr: false,
 		},
@@ -255,11 +120,11 @@ func TestNewClientWithDialer(t *testing.T) {
 					STARTTLS:           true,
 				},
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{}
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{}
 			},
 			wantErr: false,
 		},
@@ -275,11 +140,11 @@ func TestNewClientWithDialer(t *testing.T) {
 					STARTTLS: true,
 				},
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					StartTLSFunc: func(config *tls.Config) error {
 						return errors.New("STARTTLS failed")
 					},
@@ -297,15 +162,15 @@ func TestNewClientWithDialer(t *testing.T) {
 				Username: "user@example.com",
 				Password: "password123",
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{
 					DialTLSFunc: func(addr string, config *tls.Config) (IMAPClientInterface, error) {
 						return nil, errors.New("connection refused")
 					},
 				}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{}
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{}
 			},
 			wantErr:     true,
 			errContains: "cannot dial",
@@ -319,11 +184,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Username: "user@example.com",
 				Password: "wrongpassword",
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					LoginFunc: func(username, password string) error {
 						return errors.New("invalid credentials")
 					},
@@ -342,11 +207,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Password: "oauth_token",
 				XOAuth2:  true,
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					SupportAuthFunc: func(mech string) (bool, error) {
 						return mech == sasl.OAuthBearer, nil
 					},
@@ -364,11 +229,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Password: "oauth_token",
 				XOAuth2:  true,
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					SupportAuthFunc: func(mech string) (bool, error) {
 						return mech == Xoauth2, nil
 					},
@@ -386,11 +251,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Password: "oauth_token",
 				XOAuth2:  true,
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					SupportAuthFunc: func(mech string) (bool, error) {
 						return false, nil
 					},
@@ -409,11 +274,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Password: "oauth_token",
 				XOAuth2:  true,
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					SupportAuthFunc: func(mech string) (bool, error) {
 						return false, errors.New("capability check failed")
 					},
@@ -431,11 +296,11 @@ func TestNewClientWithDialer(t *testing.T) {
 				Username: "user@example.com",
 				Password: "password123",
 			},
-			setupDialer: func() *MockDialer {
-				return &MockDialer{}
+			setupDialer: func() *MoqIMAPDialer {
+				return &MoqIMAPDialer{}
 			},
-			setupClient: func() *MockIMAPClient {
-				return &MockIMAPClient{
+			setupClient: func() *MoqIMAPClient {
+				return &MoqIMAPClient{
 					SupportFunc: func(capability string) (bool, error) {
 						return false, errors.New("capability error")
 					},
@@ -554,7 +419,7 @@ func TestNewClientWithDialer_TLSConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockDialer := &MockDialer{
+			mockDialer := &MoqIMAPDialer{
 				DialTLSFunc: func(addr string, config *tls.Config) (IMAPClientInterface, error) {
 					// Verify TLS config
 					if config.InsecureSkipVerify != tt.wantInsecureSkipVerify {
@@ -570,7 +435,7 @@ func TestNewClientWithDialer_TLSConfig(t *testing.T) {
 					if config.MinVersion != tls.VersionTLS12 {
 						t.Errorf("MinVersion = %d, want %d", config.MinVersion, tls.VersionTLS12)
 					}
-					return &MockIMAPClient{}, nil
+					return &MoqIMAPClient{}, nil
 				},
 			}
 
@@ -579,7 +444,7 @@ func TestNewClientWithDialer_TLSConfig(t *testing.T) {
 				t.Errorf("NewClientWithDialer() error = %v", err)
 			}
 
-			if tt.wantTLSDial && len(mockDialer.DialTLSCalls) == 0 {
+			if tt.wantTLSDial && len(mockDialer.DialTLSCalls()) == 0 {
 				t.Error("expected DialTLS to be called")
 			}
 		})
@@ -621,13 +486,13 @@ func TestNewClientWithDialer_Retries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dialCount := 0
-			mockDialer := &MockDialer{
+			mockDialer := &MoqIMAPDialer{
 				DialFunc: func(addr string) (IMAPClientInterface, error) {
 					dialCount++
 					if dialCount <= tt.failCount {
 						return nil, errors.New("connection failed")
 					}
-					return &MockIMAPClient{}, nil
+					return &MoqIMAPClient{}, nil
 				},
 			}
 
@@ -655,8 +520,8 @@ func TestNewClientWithDialer_Retries(t *testing.T) {
 // TestNewClientWithDialer_AuthenticationMethods tests different authentication methods
 func TestNewClientWithDialer_AuthenticationMethods(t *testing.T) {
 	t.Run("standard login", func(t *testing.T) {
-		mockClient := &MockIMAPClient{}
-		mockDialer := &MockDialer{
+		mockClient := &MoqIMAPClient{}
+		mockDialer := &MoqIMAPDialer{
 			DialFunc: func(addr string) (IMAPClientInterface, error) {
 				return mockClient, nil
 			},
@@ -675,24 +540,24 @@ func TestNewClientWithDialer_AuthenticationMethods(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if len(mockClient.LoginCalls) != 1 {
-			t.Errorf("Login called %d times, want 1", len(mockClient.LoginCalls))
+		if len(mockClient.LoginCalls()) != 1 {
+			t.Errorf("Login called %d times, want 1", len(mockClient.LoginCalls()))
 		}
-		if mockClient.LoginCalls[0].Username != "testuser" {
-			t.Errorf("Login username = %q, want %q", mockClient.LoginCalls[0].Username, "testuser")
+		if mockClient.LoginCalls()[0].Username != "testuser" {
+			t.Errorf("Login username = %q, want %q", mockClient.LoginCalls()[0].Username, "testuser")
 		}
-		if mockClient.LoginCalls[0].Password != "testpass" {
-			t.Errorf("Login password = %q, want %q", mockClient.LoginCalls[0].Password, "testpass")
+		if mockClient.LoginCalls()[0].Password != "testpass" {
+			t.Errorf("Login password = %q, want %q", mockClient.LoginCalls()[0].Password, "testpass")
 		}
 	})
 
 	t.Run("OAuthBearer authentication", func(t *testing.T) {
-		mockClient := &MockIMAPClient{
+		mockClient := &MoqIMAPClient{
 			SupportAuthFunc: func(mech string) (bool, error) {
 				return mech == sasl.OAuthBearer, nil
 			},
 		}
-		mockDialer := &MockDialer{
+		mockDialer := &MoqIMAPDialer{
 			DialTLSFunc: func(addr string, config *tls.Config) (IMAPClientInterface, error) {
 				return mockClient, nil
 			},
@@ -712,25 +577,25 @@ func TestNewClientWithDialer_AuthenticationMethods(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if len(mockClient.LoginCalls) != 0 {
+		if len(mockClient.LoginCalls()) != 0 {
 			t.Errorf(
 				"Login should not be called for OAuth, got %d calls",
-				len(mockClient.LoginCalls),
+				len(mockClient.LoginCalls()),
 			)
 		}
-		if len(mockClient.AuthenticateCalls) != 1 {
-			t.Errorf("Authenticate called %d times, want 1", len(mockClient.AuthenticateCalls))
+		if len(mockClient.AuthenticateCalls()) != 1 {
+			t.Errorf("Authenticate called %d times, want 1", len(mockClient.AuthenticateCalls()))
 		}
 	})
 
 	t.Run("XOAUTH2 authentication fallback", func(t *testing.T) {
-		mockClient := &MockIMAPClient{
+		mockClient := &MoqIMAPClient{
 			SupportAuthFunc: func(mech string) (bool, error) {
 				// Only support XOAUTH2, not OAuthBearer
 				return mech == Xoauth2, nil
 			},
 		}
-		mockDialer := &MockDialer{
+		mockDialer := &MoqIMAPDialer{
 			DialTLSFunc: func(addr string, config *tls.Config) (IMAPClientInterface, error) {
 				return mockClient, nil
 			},
@@ -750,16 +615,16 @@ func TestNewClientWithDialer_AuthenticationMethods(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		if len(mockClient.AuthenticateCalls) != 1 {
-			t.Errorf("Authenticate called %d times, want 1", len(mockClient.AuthenticateCalls))
+		if len(mockClient.AuthenticateCalls()) != 1 {
+			t.Errorf("Authenticate called %d times, want 1", len(mockClient.AuthenticateCalls()))
 		}
 	})
 }
 
 // TestNewClientWithDialer_STARTTLS tests STARTTLS upgrade
 func TestNewClientWithDialer_STARTTLS(t *testing.T) {
-	mockClient := &MockIMAPClient{}
-	mockDialer := &MockDialer{
+	mockClient := &MoqIMAPClient{}
+	mockDialer := &MoqIMAPDialer{
 		DialFunc: func(addr string) (IMAPClientInterface, error) {
 			return mockClient, nil
 		},
@@ -783,13 +648,13 @@ func TestNewClientWithDialer_STARTTLS(t *testing.T) {
 	}
 
 	// Should use plain dial first
-	if len(mockDialer.DialCalls) != 1 {
-		t.Errorf("Dial called %d times, want 1", len(mockDialer.DialCalls))
+	if len(mockDialer.DialCalls()) != 1 {
+		t.Errorf("Dial called %d times, want 1", len(mockDialer.DialCalls()))
 	}
 
 	// Then upgrade with STARTTLS
-	if mockClient.StartTLSCalls != 1 {
-		t.Errorf("StartTLS called %d times, want 1", mockClient.StartTLSCalls)
+	if len(mockClient.StartTLSCalls()) != 1 {
+		t.Errorf("StartTLS called %d times, want 1", len(mockClient.StartTLSCalls()))
 	}
 }
 
@@ -837,10 +702,10 @@ func TestServerAddressFormatting(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test by checking what address is passed to the dialer
 			var dialedAddr string
-			mockDialer := &MockDialer{
+			mockDialer := &MoqIMAPDialer{
 				DialFunc: func(addr string) (IMAPClientInterface, error) {
 					dialedAddr = addr
-					return &MockIMAPClient{}, nil
+					return &MoqIMAPClient{}, nil
 				},
 			}
 
@@ -911,7 +776,15 @@ func calculateIDLETimeout(configTimeout int) time.Duration {
 
 // TestMockIMAPClient_DefaultBehavior tests that mock has sensible defaults
 func TestMockIMAPClient_DefaultBehavior(t *testing.T) {
-	mock := &MockIMAPClient{}
+	mock := &MoqIMAPClient{
+		LoggedOutFunc: func() <-chan struct{} {
+			return make(chan struct{})
+		},
+
+		SelectFunc: func(name string, readOnly bool) (*imap.MailboxStatus, error) {
+			return &imap.MailboxStatus{Messages: 0}, nil
+		},
+	}
 
 	// Login should succeed by default
 	if err := mock.Login("user", "pass"); err != nil {
@@ -960,14 +833,14 @@ func TestMockIMAPClient_DefaultBehavior(t *testing.T) {
 
 	// SetDebug should not panic
 	mock.SetDebug(nil)
-	if mock.SetDebugCalls != 1 {
-		t.Errorf("SetDebugCalls = %d, want 1", mock.SetDebugCalls)
+	if len(mock.SetDebugCalls()) != 1 {
+		t.Errorf("SetDebugCalls = %d, want 1", len(mock.SetDebugCalls()))
 	}
 }
 
 // TestMockIMAPClient_CallTracking tests that mock tracks calls correctly
 func TestMockIMAPClient_CallTracking(t *testing.T) {
-	mock := &MockIMAPClient{}
+	mock := &MoqIMAPClient{}
 
 	// Make some calls
 	_ = mock.Login("user1", "pass1")
@@ -983,41 +856,41 @@ func TestMockIMAPClient_CallTracking(t *testing.T) {
 	mock.SetDebug(nil)
 
 	// Verify tracking
-	if len(mock.LoginCalls) != 2 {
-		t.Errorf("LoginCalls count = %d, want 2", len(mock.LoginCalls))
+	if len(mock.LoginCalls()) != 2 {
+		t.Errorf("LoginCalls count = %d, want 2", len(mock.LoginCalls()))
 	}
-	if len(mock.SupportAuthCalls) != 2 {
-		t.Errorf("SupportAuthCalls count = %d, want 2", len(mock.SupportAuthCalls))
+	if len(mock.SupportAuthCalls()) != 2 {
+		t.Errorf("SupportAuthCalls count = %d, want 2", len(mock.SupportAuthCalls()))
 	}
-	if mock.StartTLSCalls != 1 {
-		t.Errorf("StartTLSCalls = %d, want 1", mock.StartTLSCalls)
+	if len(mock.StartTLSCalls()) != 1 {
+		t.Errorf("StartTLSCalls = %d, want 1", len(mock.StartTLSCalls()))
 	}
-	if len(mock.SupportCalls) != 2 {
-		t.Errorf("SupportCalls count = %d, want 2", len(mock.SupportCalls))
+	if len(mock.SupportCalls()) != 2 {
+		t.Errorf("SupportCalls count = %d, want 2", len(mock.SupportCalls()))
 	}
-	if mock.LogoutCalls != 1 {
-		t.Errorf("LogoutCalls = %d, want 1", mock.LogoutCalls)
+	if len(mock.LogoutCalls()) != 1 {
+		t.Errorf("LogoutCalls = %d, want 1", len(mock.LogoutCalls()))
 	}
-	if len(mock.SelectCalls) != 2 {
-		t.Errorf("SelectCalls count = %d, want 2", len(mock.SelectCalls))
+	if len(mock.SelectCalls()) != 2 {
+		t.Errorf("SelectCalls count = %d, want 2", len(mock.SelectCalls()))
 	}
-	if mock.SetDebugCalls != 1 {
-		t.Errorf("SetDebugCalls = %d, want 1", mock.SetDebugCalls)
+	if len(mock.SetDebugCalls()) != 1 {
+		t.Errorf("SetDebugCalls = %d, want 1", len(mock.SetDebugCalls()))
 	}
 
 	// Verify call details
-	if mock.LoginCalls[0].Username != "user1" {
-		t.Errorf("First login username = %q, want %q", mock.LoginCalls[0].Username, "user1")
+	if mock.LoginCalls()[0].Username != "user1" {
+		t.Errorf("First login username = %q, want %q", mock.LoginCalls()[0].Username, "user1")
 	}
-	if mock.SelectCalls[1].Name != "Sent" {
-		t.Errorf("Second select name = %q, want %q", mock.SelectCalls[1].Name, "Sent")
+	if mock.SelectCalls()[1].Name != "Sent" {
+		t.Errorf("Second select name = %q, want %q", mock.SelectCalls()[1].Name, "Sent")
 	}
 }
 
 // TestGetUnderlyingClient tests the GetUnderlyingClient function
 func TestGetUnderlyingClient(t *testing.T) {
 	t.Run("returns nil for mock client", func(t *testing.T) {
-		mock := &MockIMAPClient{}
+		mock := &MoqIMAPClient{}
 		result := GetUnderlyingClient(mock)
 		if result != nil {
 			t.Errorf("GetUnderlyingClient(mock) = %v, want nil", result)
