@@ -17,10 +17,12 @@ package imap
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -31,7 +33,6 @@ import (
 	idle "github.com/emersion/go-imap-idle"
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-sasl"
-	"github.com/sirupsen/logrus"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/util"
@@ -90,8 +91,13 @@ func NewClientWithDialer(
 			break
 		}
 
-		logrus.WithFields(logrus.Fields{"host": server, "tls": conf.TLS, "START TLS": conf.TLSOptions.STARTTLS, "error": err}).
-			Errorf("there was an error while dialing to host, waiting for %d second(s) to try again", wait)
+		slog.Error(
+			"there was an error while dialing to host, waiting to try again",
+			slog.Int("wait_seconds", wait),
+			slog.String("host", server),
+			slog.Bool("tls", conf.TLS),
+			slog.Bool("startTLS", conf.TLSOptions.STARTTLS),
+			slog.Any("error", err))
 		time.Sleep(time.Second * time.Duration(wait))
 	}
 
@@ -107,7 +113,7 @@ func NewClientWithDialer(
 	}
 
 	// turn on debugging
-	if logrus.GetLevel() == logrus.DebugLevel {
+	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 		pr, pw := io.Pipe()
 
 		sigChan := make(chan os.Signal, 1)
@@ -152,7 +158,9 @@ func NewClientWithDialer(
 				if !strings.Contains(err.Error(), "Parameter list contains a non-string: expected a string") && !strings.Contains(err.Error(), "Unrecognised command") {
 					return nil, fmt.Errorf("imap: %w", err)
 				}
-				logrus.WithError(err).Debug("IMAP server supports ID command but gave malformed response, ignoring...")
+				slog.Debug(
+					"IMAP server supports ID command but gave malformed response, ignoring...",
+					slog.Any("error", err))
 			}
 		}
 	} else {

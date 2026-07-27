@@ -2,9 +2,9 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -25,7 +25,7 @@ func LoadYAML(filename string) (*Configuration, error) {
 			return nil, fmt.Errorf("config: parse yaml in 'legacy' format %q: %w",
 				filename, err)
 		}
-		logrus.Info("legacy format configuration detected")
+		slog.Info("legacy format configuration detected")
 		cfg.Configurations = LegacyConverter(legacy)
 	}
 

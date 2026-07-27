@@ -20,12 +20,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"sync"
 	"text/template"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
@@ -56,22 +55,21 @@ func NewRunningBox(debug bool, wait int) *RunningBox {
 
 // Schedule debounces events before queueing them for execution
 func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue chan imap.IDLEEvent) {
-	l := logrus.WithField("alias", rsp.Alias).WithField("mailbox", rsp.Mailbox)
+	l := slog.With(
+		slog.String("alias", rsp.Alias),
+		slog.String("mailbox", rsp.Mailbox))
 	if ShouldSkip(rsp.Box) {
-		l.Warnf("No command for %q, skipping scheduling...", rsp.Reason)
+		l.Warn("No command for event, skipping scheduling...",
+			slog.String("reason", rsp.Reason.String()))
 		return
 	}
 
 	key := rsp.Alias + rsp.Mailbox
 	wait := time.Duration(r.Wait) * time.Second
 	when := time.Now().Add(wait).Format(time.RFC850)
-	format := fmt.Sprintf("%%s syncing %q for %s (%s in the future)", rsp.Reason, when, wait)
 
 	value, exists := r.timer.LoadOrStore(key, time.NewTimer(wait))
-	wristwatch, ok := value.(*time.Timer)
-	if !ok {
-		l.Fatal("stored value isn't *time.Timer")
-	}
+	wristwatch := value.(*time.Timer)
 
 	main := true // main is true for the goroutine that will run sync
 	if exists {
@@ -84,7 +82,10 @@ func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue ch
 	}
 
 	if main {
-		l.Infof(format, "scheduled")
+		l.Info("scheduled syncing",
+			slog.String("reason", rsp.Reason.String()),
+			slog.String("when", when),
+			slog.Duration("wait", wait))
 		select {
 		case <-wristwatch.C:
 			queue <- rsp
@@ -92,15 +93,20 @@ func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue ch
 			// just get out
 		}
 	} else {
-		l.Infof(format, "rescheduled")
+		l.Info("rescheduled syncing",
+			slog.String("reason", rsp.Reason.String()),
+			slog.String("when", when),
+			slog.Duration("wait", wait))
 	}
 }
 
 // Run executes commands based on the event type
 func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
-	l := logrus.WithField("alias", rsp.Alias).WithField("mailbox", rsp.Mailbox)
+	l := slog.With(
+		slog.String("alias", rsp.Alias),
+		slog.String("mailbox", rsp.Mailbox))
 	if r.Debug {
-		l.Infoln("Running synchronization...")
+		l.Info("Running synchronization...")
 	}
 
 	switch rsp.Reason {
@@ -125,9 +131,9 @@ func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
 			return err
 		}
 	default:
-		l.WithField("reason", rsp.Reason).Error("unknown reason value, ignoring...")
+		l.Error("unknown reason value, ignoring...",
+			slog.String("reason", rsp.Reason.String()))
 	}
-
 	return nil
 }
 
@@ -166,11 +172,11 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 	out, err := call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
-			logrus.Errorf("stderror: %q", string(exiterr.Stderr))
+			slog.Error("stderror: " + string(exiterr.Stderr))
 		}
 		return fmt.Errorf("On%sMail command failed: %w", callKind, err)
 	}
-	logrus.Infof("stdout: %q", string(out))
+	slog.Info("stdout: " + string(out))
 
 	if onpost == "SKIP" || onpost == "" {
 		return nil
@@ -195,12 +201,11 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 	out, err = call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
-			logrus.Errorf("stderror: %q", string(exiterr.Stderr))
+			slog.Error("stderror: " + string(exiterr.Stderr))
 		}
 		return fmt.Errorf("On%sMailPost command failed: %w", callKind, err)
 	}
-	logrus.Infof("stdout: %q", string(out))
-
+	slog.Info("stdout: " + string(out))
 	return nil
 }
 

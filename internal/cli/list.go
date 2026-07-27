@@ -2,8 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
@@ -37,7 +37,9 @@ func listMailboxes(topConfig *config.Configuration) error {
 				"listing mailboxes finished with error, account=%s: %w",
 				account.Alias, err)
 		}
-		logrus.WithField("account", account.Alias).Info("walking through the account mailboxes")
+
+		slog.Info("walking through the account mailboxes",
+			slog.String("account", account.Alias))
 		err = util.WalkMailbox(client, "", 0, mailboxCount)
 		if err != nil {
 			return fmt.Errorf(

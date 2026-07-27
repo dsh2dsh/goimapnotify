@@ -20,10 +20,9 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
@@ -38,11 +37,10 @@ func PrepareCommand(command string, rsp config.IDLEEvent) *exec.Cmd {
 	}
 
 	commandsplt := append([]string{"sh", "-c"}, commandstr)
-	logrus.Debugf("Command: %s", strings.Join(commandsplt, " "))
+	slog.Debug("Command: " + strings.Join(commandsplt, " "))
 	// #nosec
 	cmd := exec.Command(commandsplt[0], commandsplt[1:]...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
-
 	return cmd
 }

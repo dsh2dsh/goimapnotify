@@ -17,11 +17,12 @@ package imap
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"log/slog"
+	"os"
 	"strings"
 	"sync"
 
 	"github.com/emersion/go-imap/client"
-	"github.com/sirupsen/logrus"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
@@ -56,18 +57,22 @@ func (w *WatchMailBox) Watch() {
 	updates := make(chan client.Update)
 	done := make(chan error, 1)
 
-	l := logrus.WithFields(logrus.Fields{"alias": w.box.Alias, "mailbox": w.box.Mailbox})
+	l := slog.With(
+		slog.String("alias", w.box.Alias),
+		slog.String("mailbox", w.box.Mailbox),
+	)
 
 	status, err := w.client.Select(w.box.Mailbox, true)
 	if err != nil {
 		if strings.Contains(err.Error(), "reason: Unknown Mailbox") {
-			l.WithError(err).Warn("cannot select mailbox, skipped!")
+			l.Warn("cannot select mailbox, skipped!", slog.Any("error", err))
 			return
 		}
-		l.WithError(err).Fatal("cannot select mailbox")
+		l.Error("cannot select mailbox", slog.Any("error", err))
+		os.Exit(1)
 	}
 	w.box.ExistingEmail = status.Messages
-	l.Debugf("existing mail: %d", w.box.ExistingEmail)
+	l.Debug("existing mail", slog.Uint64("count", uint64(w.box.ExistingEmail)))
 
 	w.client.SetUpdatesChannel(updates)
 
@@ -139,7 +144,8 @@ func (w *WatchMailBox) Watch() {
 		case finished := <-done:
 			l.Warn("done watching mailbox")
 			if finished != nil {
-				l.WithError(finished).Info("watching stopped because of an error")
+				l.Info("watching stopped because of an error",
+					slog.Any("error", finished))
 				w.boxEvent <- BoxEvent{UniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
 			}
 			run = false

@@ -3,9 +3,8 @@ package util
 import (
 	"bufio"
 	"io"
+	"log/slog"
 	"regexp"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -22,12 +21,12 @@ func CensorCredentials(in io.Reader, out io.Writer) {
 
 		_, err := out.Write([]byte(censoredLine + "\n"))
 		if err != nil {
-			logrus.WithError(err).Error("unable to write censored line")
+			slog.Error("unable to write censored line", slog.Any("error", err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logrus.WithError(err).Error("unable to scan censored line")
+		slog.Error("unable to scan censored line", slog.Any("error", err))
 	}
 }
 

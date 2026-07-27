@@ -17,9 +17,9 @@ package util
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"log/slog"
+	"os"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
@@ -34,7 +34,9 @@ func RetrievePasswordCmd(conf config.NotifyConfig) config.NotifyConfig {
 		if err == nil {
 			conf.Password = strings.Trim(string(buf), "\n")
 		} else {
-			logrus.WithError(err).Fatal("cannot retrieve password from command")
+			slog.Error("cannot retrieve password from command",
+				slog.Any("error", err))
+			os.Exit(1)
 		}
 	}
 	return conf
@@ -50,7 +52,9 @@ func RetrieveUsernameCmd(conf config.NotifyConfig) config.NotifyConfig {
 		if err == nil {
 			conf.Username = strings.Trim(string(buf), "\n")
 		} else {
-			logrus.WithError(err).Fatal("cannot retrieve username from command")
+			slog.Error("cannot retrieve username from command",
+				slog.Any("error", err))
+			os.Exit(1)
 		}
 	}
 	return conf
@@ -66,7 +70,9 @@ func RetrieveHostCmd(conf config.NotifyConfig) config.NotifyConfig {
 		if err == nil {
 			conf.Host = strings.Trim(string(buf), "\n")
 		} else {
-			logrus.WithError(err).Fatal("cannot retrieve host from command")
+			slog.Error("cannot retrieve host from command",
+				slog.Any("error", err))
+			os.Exit(1)
 		}
 	}
 	return conf

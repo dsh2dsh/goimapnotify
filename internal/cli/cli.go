@@ -17,7 +17,9 @@ package cli
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -28,9 +30,9 @@ import (
 	"time"
 
 	goimap "github.com/emersion/go-imap"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/dsh2dsh/goimapnotify/internal/cli/logger"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
@@ -75,8 +77,10 @@ func init() {
 	Cmd.PersistentFlags().IntVarP(&flagRetries, "dial-retry-attempts", "r", 5,
 		"number of attempts when connecting to an IMAP server, using exponential backoff")
 
-	Cmd.PersistentFlags().BoolVarP(&flagSyslog, "syslog", "s", false,
-		"send log output to syslog instead of stderr")
+	if logger.HasSyslog() {
+		Cmd.PersistentFlags().BoolVarP(&flagSyslog, "syslog", "s", false,
+			"send log output to syslog instead of stderr")
+	}
 
 	Cmd.Flags().BoolVar(&flagList, "list", false, "List all mailboxes and exit")
 	Cmd.AddCommand(&listCmd)
@@ -107,25 +111,24 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	// https://github.com/spf13/cobra/issues/340#issuecomment-378726225
 	cmd.SilenceUsage = true
 
+	var logLevel slog.Level
 	switch strings.ToLower(flagLogLevel) {
 	case "debug":
-		logrus.SetLevel(logrus.DebugLevel)
+		logLevel = slog.LevelDebug
 		debug = true
 	case "info", "information":
-		logrus.SetLevel(logrus.InfoLevel)
+		logLevel = slog.LevelInfo
 	case "warn", "warning":
-		logrus.SetLevel(logrus.WarnLevel)
+		logLevel = slog.LevelWarn
 	case "error":
-		logrus.SetLevel(logrus.ErrorLevel)
+		logLevel = slog.LevelError
 	default:
 		return fmt.Errorf("invalid --log-level: %s (want error|warn|info|debug)",
 			flagLogLevel)
 	}
 
-	if flagSyslog {
-		if err := enableSyslog(); err != nil {
-			return err
-		}
+	if err := logger.InitializeDefaultLogger(logLevel, flagSyslog); err != nil {
+		return err
 	}
 
 	cfg, err := loadConfiguration(flagConfig, flagRetries)
@@ -133,12 +136,16 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("can't load the configuration %q: %w", flagConfig, err)
 	}
 	topConfig = cfg
-	logrus.Debugf("configuration loaded successfully: %q", flagConfig)
+	slog.Debug("configuration loaded successfully",
+		slog.String("file", flagConfig))
 	return nil
 }
 
 func Run() error {
-	logrus.Infof("ℹ Running commit %s, tag %s, branch %s", commit, gittag, branch)
+	slog.Info("Running",
+		slog.String("commit", commit),
+		slog.String("tag", gittag),
+		slog.String("branch", branch))
 
 	idleChan := make(chan imap.IDLEEvent)
 	queueChan := make(chan imap.IDLEEvent, 100)
@@ -169,9 +176,8 @@ func Run() error {
 
 			client, err := imap.NewIMAPIDLEClient(account, flagRetries)
 			if err != nil {
-				logrus.WithError(err).
-					WithField("account", account.Alias).
-					Warn("Initial connection failed, retrying in background")
+				slog.Warn("Initial connection failed, retrying in background",
+					slog.String("account", account.Alias), slog.Any("error", err))
 				mailbox.Alias = account.Alias
 				wg.Add(1)
 				go reconnectWatcher(
@@ -188,9 +194,9 @@ idleLoop:
 	for {
 		select {
 		case boxEvent := <-boxChan:
-			l := logrus.WithField("alias", boxEvent.Mailbox.Alias).
-				WithField("mailbox", boxEvent.Mailbox.Mailbox)
-			l.Info("Restarting watcher for mailbox")
+			slog.Info("Restarting watcher for mailbox",
+				slog.String("alias", boxEvent.Mailbox.Alias),
+				slog.String("mailbox", boxEvent.Mailbox.Mailbox))
 			key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
 			wg.Add(1)
 			go reconnectWatcher(
@@ -214,16 +220,18 @@ idleLoop:
 			err := running.Run(event)
 			wg.Done()
 			if err != nil {
-				logrus.WithError(err).
-					WithFields(logrus.Fields{"alias": event.Alias, "box": event.Box.Mailbox}).
-					Errorf("an error was encountered while executing commands for %q", event.Reason)
+				slog.Error("an error was encountered while executing commands for",
+					slog.String("reason", event.Reason.String()),
+					slog.String("alias", event.Alias),
+					slog.String("box", event.Box.Mailbox),
+					slog.Any("error", err))
 			}
 		}
 	}
 
-	logrus.Info("waiting other goroutines to stop...")
+	slog.Info("waiting other goroutines to stop...")
 	wg.Wait()
-	logrus.Info("bye")
+	slog.Info("bye")
 	return nil
 }
 
@@ -235,69 +243,65 @@ func loadConfiguration(filename string, retries int,
 	}
 
 	for i := range cfg.Configurations {
-		cfg.Configurations[i] = util.RetrieveCmd(cfg.Configurations[i])
-		if cfg.Configurations[i].Alias == "" {
-			cfg.Configurations[i].Alias = cfg.Configurations[i].Username
+		conf := &cfg.Configurations[i]
+		*conf = util.RetrieveCmd(*conf)
+		if conf.Alias == "" {
+			conf.Alias = conf.Username
 		}
-		if logrus.GetLevel() == logrus.DebugLevel {
-			cfg.Configurations[i].Alias = "<?>"
+		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+			conf.Alias = "<?>"
 		}
 
-		conf := cfg.Configurations[i]
+		if len(conf.Boxes) != 0 {
+			// replace all listed mailboxes with the same mailboxes carrying values
+			// from the configuration
+			for i := range conf.Boxes {
+				mailbox := &conf.Boxes[i]
+				box, err := config.SetFromConfig(*conf, *mailbox)
+				if err != nil {
+					return nil, fmt.Errorf("template is invalid: %w", err)
+				}
+				*mailbox = box
+			}
+			continue
+		}
 
 		// If there is no mailboxes, watch over all mailboxes of the account
-		if len(conf.Boxes) == 0 {
-			client, err := imap.NewIMAPIDLEClient(conf, retries)
+		client, err := imap.NewIMAPIDLEClient(*conf, retries)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"account %q, failed to create IMAP client, error: %w",
+				conf.Username, err,
+			)
+		}
+		defer client.Logout()
+
+		// NOTE(shackra): Having to do this is really disgusting, v2 offers a
+		// better way for listing mailboxes. I should consider updating.
+		ch := make(chan *goimap.MailboxInfo)
+		go func() {
+			if err := client.List("", "*", ch); err != nil {
+				slog.Error("failed to list all mailboxes",
+					slog.String("account", conf.Username),
+					slog.Any("error", err))
+				os.Exit(1)
+			}
+		}()
+
+		for mailbox := range ch {
+			// Ignore mailboxes with attributes `\All` and `\Noselect`
+			if slices.Contains(mailbox.Attributes, "\\All") ||
+				slices.Contains(mailbox.Attributes, "\\Noselect") {
+				continue
+			}
+
+			box, err := config.SetFromConfig(*conf, config.Box{
+				Mailbox: mailbox.Name,
+			})
 			if err != nil {
-				return nil, fmt.Errorf(
-					"account %q, failed to create IMAP client, error: %w",
-					conf.Username,
-					err,
-				)
+				return nil, fmt.Errorf("template is invalid: %w", err)
 			}
-			defer client.Logout()
-
-			// NOTE(shackra): Having to do this is really disgusting, v2 offers a better way for listing mailboxes. I should consider updating.
-			ch := make(chan *goimap.MailboxInfo)
-			go func() {
-				err := client.List("", "*", ch)
-				if err != nil {
-					logrus.WithError(err).
-						WithField("account", conf.Username).
-						Fatal("failed to list all mailboxes")
-				}
-			}()
-
-			for mailbox := range ch {
-				// Ignore mailboxes with attributes `\All` and `\Noselect`
-				if slices.Contains(mailbox.Attributes, "\\All") ||
-					slices.Contains(mailbox.Attributes, "\\Noselect") {
-					continue
-				}
-
-				box, err := config.SetFromConfig(conf, config.Box{
-					Mailbox: mailbox.Name,
-				})
-				if err != nil {
-					logrus.WithError(err).Fatal("template is invalid")
-				}
-				cfg.Configurations[i].Boxes = append(
-					cfg.Configurations[i].Boxes,
-					box,
-				)
-			}
-		} else {
-			// replace all listed mailboxes with the same mailboxes carrying values from the configuration
-			for mailbox := range cfg.Configurations[i].Boxes {
-				box, err := config.SetFromConfig(
-					conf,
-					cfg.Configurations[i].Boxes[mailbox],
-				)
-				if err != nil {
-					logrus.WithError(err).Fatal("template is invalid")
-				}
-				cfg.Configurations[i].Boxes[mailbox] = box
-			}
+			conf.Boxes = append(conf.Boxes, box)
 		}
 	}
 	return cfg, nil
@@ -314,8 +318,10 @@ func reconnectWatcher(
 ) {
 	defer wg.Done()
 
-	l := logrus.WithField("alias", event.Mailbox.Alias).
-		WithField("mailbox", event.Mailbox.Mailbox)
+	l := slog.With(
+		slog.String("alias", event.Mailbox.Alias),
+		slog.String("mailbox", event.Mailbox.Mailbox),
+	)
 
 	backoff := time.Second
 	maxBackoff := 5 * time.Minute
@@ -333,7 +339,8 @@ func reconnectWatcher(
 			if isAuthError(err) && backoff < 30*time.Second {
 				backoff = 30 * time.Second
 			}
-			l.WithError(err).Warnf("Reconnection failed, retrying in %s", backoff)
+			l.Warn("Reconnection failed",
+				slog.Duration("retrying", backoff), slog.Any("error", err))
 			select {
 			case <-time.After(backoff):
 			case <-quitChan:

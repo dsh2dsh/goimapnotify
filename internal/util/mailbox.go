@@ -18,11 +18,11 @@ package util
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	imap "github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
-	"github.com/sirupsen/logrus"
 )
 
 // PrintDelimiter prints the hierarchy delimiter and returns mailbox count
@@ -65,7 +65,7 @@ func WalkMailbox(c *client.Client, b string, l, mailboxCount int) error {
 			if attr == "\\Haschildren" {
 				err := WalkMailbox(c, m.Name, l+1, mailboxCount)
 				if err != nil {
-					logrus.WithError(err).Error("cannot keep walking mailboxes\n")
+					slog.Error("cannot keep walking mailboxes", slog.Any("error", err))
 					return err
 				}
 				break
