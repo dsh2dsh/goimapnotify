@@ -256,11 +256,9 @@ func loadConfiguration(filename string, retries int,
 			// from the configuration
 			for i := range conf.Boxes {
 				mailbox := &conf.Boxes[i]
-				box, err := config.SetFromConfig(*conf, *mailbox)
-				if err != nil {
+				if err := conf.FillBox(mailbox); err != nil {
 					return nil, fmt.Errorf("template is invalid: %w", err)
 				}
-				*mailbox = box
 			}
 			continue
 		}
@@ -294,10 +292,8 @@ func loadConfiguration(filename string, retries int,
 				continue
 			}
 
-			box, err := config.SetFromConfig(*conf, config.Box{
-				Mailbox: mailbox.Name,
-			})
-			if err != nil {
+			box := config.Box{Mailbox: mailbox.Name}
+			if err := conf.FillBox(&box); err != nil {
 				return nil, fmt.Errorf("template is invalid: %w", err)
 			}
 			conf.Boxes = append(conf.Boxes, box)

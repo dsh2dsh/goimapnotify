@@ -154,12 +154,12 @@ func prepareAndRun(on, onpost string, event config.IDLEEvent) error {
 		return nil
 	}
 
-	bufOn := bytes.NewBuffer(nil)
+	var bufOn bytes.Buffer
 	tOn, err := template.New("run").Parse(on)
 	if err != nil {
 		return fmt.Errorf("cannot compile template for 'on' command, error: %w", err)
 	}
-	err = tOn.Execute(bufOn, event)
+	err = tOn.Execute(&bufOn, event)
 	if err != nil {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}

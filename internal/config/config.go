@@ -16,12 +16,6 @@ package config
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import (
-	"bytes"
-	"fmt"
-	"text/template"
-)
-
 // EventType represents the type of IMAP event
 type EventType int
 
@@ -128,61 +122,4 @@ type IDLEEvent struct {
 	Reason        EventType
 	ExistingEmail int
 	Box           Box
-}
-
-// CompileTemplate tests that the string template is valid, if any was
-// provided.
-func CompileTemplate(i string) error {
-	t, err := template.New("test").Parse(i)
-	if err != nil {
-		return fmt.Errorf("config: %w", err)
-	}
-	buf := bytes.NewBuffer(nil)
-
-	input := IDLEEvent{
-		Alias:   "example@example.com",
-		Mailbox: "Inbox",
-	}
-
-	if err := t.Execute(buf, &input); err != nil {
-		return fmt.Errorf("config: %w", err)
-	}
-	return nil
-}
-
-// SetFromConfig inherits config values to Box and validates templates
-func SetFromConfig(conf NotifyConfig, box Box) (Box, error) {
-	if box.OnNewMail == "" {
-		box.OnNewMail = conf.OnNewMail
-	}
-	err := CompileTemplate(box.OnNewMail)
-	if err != nil {
-		return box, err
-	}
-	if box.OnNewMailPost == "" {
-		box.OnNewMailPost = conf.OnNewMailPost
-	}
-	err = CompileTemplate(box.OnNewMailPost)
-	if err != nil {
-		return box, err
-	}
-
-	// for deleted email
-	if box.OnDeletedMail == "" {
-		box.OnDeletedMail = conf.OnDeletedMail
-	}
-	err = CompileTemplate(box.OnDeletedMail)
-	if err != nil {
-		return box, err
-	}
-	if box.OnDeletedMailPost == "" {
-		box.OnDeletedMailPost = conf.OnDeletedMailPost
-	}
-	err = CompileTemplate(box.OnDeletedMailPost)
-	if err != nil {
-		return box, err
-	}
-
-	box.Alias = conf.Alias
-	return box, nil
 }
