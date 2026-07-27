@@ -45,7 +45,7 @@ type BoxEvent struct {
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	client    WatchClientInterface
+	client    *IMAPIDLEClient
 	box       config.Box
 	idleEvent chan<- IDLEEvent
 	boxEvent  chan<- BoxEvent
@@ -74,7 +74,7 @@ func (w *WatchMailBox) Watch() {
 	w.box.ExistingEmail = status.Messages
 	l.Debug("existing mail", slog.Uint64("count", uint64(w.box.ExistingEmail)))
 
-	w.client.SetUpdatesChannel(updates)
+	w.client.Updates = updates
 
 	go func() {
 		l.Info("Watching mailbox")
@@ -160,20 +160,6 @@ func (w *WatchMailBox) Watch() {
 // NewWatchBox creates a new instance of WatchMailBox and launches it
 func NewWatchBox(
 	c *IMAPIDLEClient,
-	f config.NotifyConfig,
-	m config.Box,
-	i chan<- IDLEEvent,
-	b chan<- BoxEvent,
-	q <-chan struct{},
-	wg *sync.WaitGroup,
-) {
-	NewWatchBoxWithClient(WrapIMAPIDLEClient(c), f, m, i, b, q, wg)
-}
-
-// NewWatchBoxWithClient creates a new instance of WatchMailBox with a custom client and launches it.
-// This function is useful for testing with mock clients.
-func NewWatchBoxWithClient(
-	c WatchClientInterface,
 	f config.NotifyConfig,
 	m config.Box,
 	i chan<- IDLEEvent,

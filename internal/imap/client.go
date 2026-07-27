@@ -19,12 +19,12 @@ package imap
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -48,43 +48,19 @@ type IMAPIDLEClient struct {
 }
 
 // NewClient creates a new IMAP client with the given configuration.
-// This is a convenience wrapper around NewClientWithDialer that uses the default dialer.
-func NewClient(conf config.NotifyConfig, retries int) (*client.Client, error) {
-	c, err := NewClientWithDialer(DefaultDialer(), conf, retries)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the underlying client for backward compatibility
-	if underlying := GetUnderlyingClient(c); underlying != nil {
-		return underlying, nil
-	}
-
-	// This shouldn't happen with the default dialer, but handle it gracefully
-	return nil, errors.New("unexpected client type returned from dialer")
-}
-
-// NewClientWithDialer creates a new IMAP client with the given configuration and dialer.
-// This function allows for dependency injection of the dialer for testing purposes.
-func NewClientWithDialer(
-	dialer IMAPDialer,
-	conf config.NotifyConfig,
-	retries int,
-) (IMAPClientInterface, error) {
-	server := fmt.Sprintf("%s:%d", conf.Host, conf.Port)
-
-	var c IMAPClientInterface
-	var err error
+func NewClient(conf config.NotifyConfig, retries int,
+) (c *client.Client, err error) {
+	server := conf.Host + ":" + strconv.Itoa(conf.Port)
 
 	for wait := 1; wait <= retries; wait++ {
 		if conf.TLS && !conf.TLSOptions.STARTTLS {
-			c, err = dialer.DialTLS(server, &tls.Config{
+			c, err = client.DialTLS(server, &tls.Config{
 				ServerName:         conf.Host,
 				InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
 				MinVersion:         tls.VersionTLS12,
 			})
 		} else {
-			c, err = dialer.Dial(server)
+			c, err = client.Dial(server)
 		}
 
 		if err == nil {
@@ -97,7 +73,8 @@ func NewClientWithDialer(
 			slog.String("host", server),
 			slog.Bool("tls", conf.TLS),
 			slog.Bool("startTLS", conf.TLSOptions.STARTTLS),
-			slog.Any("error", err))
+			slog.Any("error", err),
+		)
 		time.Sleep(time.Second * time.Duration(wait))
 	}
 
@@ -115,9 +92,7 @@ func NewClientWithDialer(
 	// turn on debugging
 	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 		pr, pw := io.Pipe()
-
 		sigChan := make(chan os.Signal, 1)
-
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 		go func() {
@@ -126,7 +101,6 @@ func NewClientWithDialer(
 		}()
 
 		go util.CensorCredentials(pr, os.Stdout)
-
 		c.SetDebug(pw)
 	}
 
@@ -136,40 +110,30 @@ func NewClientWithDialer(
 			InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("imap: %w", err)
 		}
 	}
 
 	// Handle ID command - only works with real client
-	if underlying := GetUnderlyingClient(c); underlying != nil {
-		if ok, err := c.Support(imapid.Capability); err != nil {
-			return nil, fmt.Errorf(
-				"unable to check support for capability %s, error: %w",
-				imapid.Capability,
-				err,
-			)
-		} else if ok && conf.EnableIDCommand {
-			idClient := imapid.NewClient(underlying)
-			_, err := idClient.ID(imapid.ID{
-				imapid.FieldName:    "goimapnotify",
-				imapid.FieldVersion: Version,
-			})
-			if err != nil {
-				if !strings.Contains(err.Error(), "Parameter list contains a non-string: expected a string") && !strings.Contains(err.Error(), "Unrecognised command") {
-					return nil, fmt.Errorf("imap: %w", err)
-				}
-				slog.Debug(
-					"IMAP server supports ID command but gave malformed response, ignoring...",
-					slog.Any("error", err))
+	if ok, err := c.Support(imapid.Capability); err != nil {
+		return nil, fmt.Errorf(
+			"unable to check support for capability %s, error: %w",
+			imapid.Capability,
+			err,
+		)
+	} else if ok && conf.EnableIDCommand {
+		idClient := imapid.NewClient(c)
+		_, err := idClient.ID(imapid.ID{
+			imapid.FieldName:    "goimapnotify",
+			imapid.FieldVersion: Version,
+		})
+		if err != nil {
+			if !strings.Contains(err.Error(), "Parameter list contains a non-string: expected a string") && !strings.Contains(err.Error(), "Unrecognised command") {
+				return nil, fmt.Errorf("imap: %w", err)
 			}
-		}
-	} else {
-		// For mock clients, just check support without running ID command
-		if _, err := c.Support(imapid.Capability); err != nil {
-			return nil, fmt.Errorf(
-				"unable to check support for capability %s, error: %w",
-				imapid.Capability,
-				err,
+			slog.Debug(
+				"IMAP server supports ID command but gave malformed response, ignoring...",
+				slog.Any("error", err),
 			)
 		}
 	}
@@ -199,20 +163,19 @@ func NewClientWithDialer(
 			}
 			sasl_client := sasl.NewOAuthBearerClient(sasl_oauth)
 			if err := c.Authenticate(sasl_client); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("imap: %w", err)
 			}
 		} else if okXOAuth2 {
 			sasl_xoauth2 := NewXoauth2Client(conf.Username, conf.Password)
 			if err := c.Authenticate(sasl_xoauth2); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("imap: %w", err)
 			}
 		}
 	} else {
 		if err := c.Login(conf.Username, conf.Password); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("imap: %w", err)
 		}
 	}
-
 	return c, nil
 }
 
