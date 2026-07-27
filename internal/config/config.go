@@ -16,31 +16,6 @@ package config
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// EventType represents the type of IMAP event
-type EventType int
-
-const (
-	NEWMAIL EventType = iota + 1
-	DELETEDMAIL
-	FLAGCHANGED
-	SYNC
-)
-
-func (e EventType) String() string {
-	switch e {
-	case NEWMAIL:
-		return "New Email"
-	case DELETEDMAIL:
-		return "Deleted Email"
-	case FLAGCHANGED:
-		return "Changed Flag on Email"
-	case SYNC:
-		return "Synchronize mailboxes without post-steps"
-	default:
-		return "Unknown Event"
-	}
-}
-
 // Configuration holds the top-level configuration
 type Configuration struct {
 	Configurations []NotifyConfig `yaml:"configurations" json:"configurations"`
@@ -113,13 +88,4 @@ type Box struct {
 	OnDeletedMail     string    `json:"onDeletedMail"     yaml:"onDeletedMail"`
 	OnDeletedMailPost string    `json:"onDeletedMailPost" yaml:"onDeletedMailPost"`
 	ExistingEmail     uint32    `json:"-"                 yaml:"-"`
-}
-
-// IDLEEvent models an IDLE event
-type IDLEEvent struct {
-	Alias         string
-	Mailbox       string
-	Reason        EventType
-	ExistingEmail int
-	Box           Box
 }
