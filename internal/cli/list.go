@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"strings"
 
-	goimap "github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 	"github.com/spf13/cobra"
 
@@ -46,7 +45,7 @@ func listMailboxes(topConfig *config.Configuration) error {
 			slog.String("account", account.Alias),
 			slog.Int("count", mailboxCount))
 
-		err = walkMailbox(client, "", 0, mailboxCount)
+		err = printMailbox(client, mailboxCount)
 		if err != nil {
 			return fmt.Errorf(
 				"something went wrong while walking on the account listing all mailboxes, account=%s: %w",
@@ -59,54 +58,33 @@ func listMailboxes(topConfig *config.Configuration) error {
 
 // printDelimiter prints the hierarchy delimiter and returns mailbox count
 func printDelimiter(c *client.Client) (int, error) {
-	mailboxes := make(chan *goimap.MailboxInfo, 10)
-	done := make(chan error, 1)
-	go func() {
-		done <- c.List("", "*", mailboxes)
-	}()
+	var count int
+	var delimiter string
 
-	i := 0
-	m := <-mailboxes
-	for range mailboxes {
-		i += 1
-	}
-	if err := <-done; err != nil {
-		return 0, err
+	for m, err := range imap.Mailboxes(c) {
+		if err != nil {
+			return 0, err
+		}
+		if count == 0 {
+			delimiter = m.Delimiter
+		}
+		count++
 	}
 
-	fmt.Println("Hierarchy delimiter is:", m.Delimiter)
-	return i, nil
+	fmt.Println("Hierarchy delimiter is:", delimiter)
+	return count - 1, nil
 }
 
-// walkMailbox recursively lists mailboxes with tree visualization
-func walkMailbox(c *client.Client, b string, l, mailboxCount int) error {
-	// FIXME: This can be done better
-	mailboxes := make(chan *goimap.MailboxInfo, 10)
-	done := make(chan error, 1)
-	go func() {
-		done <- c.List(b, "*", mailboxes)
-	}()
-
-	pos := 0
-	for m := range mailboxes {
-		box := boxchar(pos, l, mailboxCount)
-		fmt.Println(box, m.Name)
-		pos += 1
-		// Check if mailbox has children mailboxes
-		for _, attr := range m.Attributes {
-			if attr == "\\Haschildren" {
-				err := walkMailbox(c, m.Name, l+1, mailboxCount)
-				if err != nil {
-					slog.Error("cannot keep walking mailboxes", slog.Any("error", err))
-					return err
-				}
-				break
-			}
+// printMailbox recursively lists mailboxes with tree visualization
+func printMailbox(c *client.Client, mailboxCount int) error {
+	var pos int
+	for m, err := range imap.Mailboxes(c) {
+		if err != nil {
+			return err
 		}
-	}
-
-	if err := <-done; err != nil {
-		return err
+		box := boxchar(pos, 0, mailboxCount)
+		fmt.Println(box, m.Name)
+		pos++
 	}
 	return nil
 }

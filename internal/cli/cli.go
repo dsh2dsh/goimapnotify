@@ -28,7 +28,6 @@ import (
 	"syscall"
 	"time"
 
-	goimap "github.com/emersion/go-imap"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/cli/logger"
@@ -263,29 +262,21 @@ func loadConfiguration(filename string, retries int,
 		}
 
 		// If there is no mailboxes, watch over all mailboxes of the account
-		client, err := imap.New(*conf, retries)
+		c, err := imap.New(*conf, retries)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"account %q, failed to create IMAP client, error: %w",
 				conf.Username, err,
 			)
 		}
-		defer client.Logout()
-
-		// NOTE(shackra): Having to do this is really disgusting, v2 offers a
-		// better way for listing mailboxes. I should consider updating.
-		ch := make(chan *goimap.MailboxInfo)
-		go func() {
-			if err := client.List("", "*", ch); err != nil {
-				slog.Error("failed to list all mailboxes",
-					slog.String("account", conf.Username),
-					slog.Any("error", err))
-				os.Exit(1)
-			}
-		}()
+		defer c.Logout()
 
 	mailboxLoop:
-		for mailbox := range ch {
+		for mailbox, err := range imap.Mailboxes(c) {
+			if err != nil {
+				return nil, fmt.Errorf(
+					"failed to list all mailboxes, account=%s: %w", conf.Username, err)
+			}
 			// Ignore mailboxes with attributes `\All` and `\Noselect`
 			for _, attr := range mailbox.Attributes {
 				if attr == "\\All" || attr == "\\Noselect" {
