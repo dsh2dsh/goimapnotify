@@ -36,7 +36,6 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
-	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 var (
@@ -244,7 +243,7 @@ func loadConfiguration(filename string, retries int,
 
 	for i := range cfg.Configurations {
 		conf := &cfg.Configurations[i]
-		*conf = util.RetrieveCmd(*conf)
+		conf.RetrieveCmd()
 		if conf.Alias == "" {
 			conf.Alias = conf.Username
 		}

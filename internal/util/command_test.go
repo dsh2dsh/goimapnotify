@@ -21,76 +21,63 @@ package util
 import (
 	"reflect"
 	"testing"
-
-	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 func TestPrepareCommand(t *testing.T) {
 	tests := []struct {
 		name     string
 		command  string
-		event    config.IDLEEvent
+		mailbox  string
 		wantArgs []string
 	}{
 		{
 			name:     "simple command",
 			command:  "echo hello",
-			event:    config.IDLEEvent{},
 			wantArgs: []string{"sh", "-c", "echo hello"},
 		},
 		{
-			name:    "command with %s placeholder",
-			command: "mbsync %s",
-			event: config.IDLEEvent{
-				Mailbox: "INBOX",
-			},
+			name:     "command with %s placeholder",
+			command:  "mbsync %s",
+			mailbox:  "INBOX",
 			wantArgs: []string{"sh", "-c", "mbsync INBOX"},
 		},
 		{
 			name:     "command with quotes",
 			command:  "emacsclient -e '(something)'",
-			event:    config.IDLEEvent{},
 			wantArgs: []string{"sh", "-c", "emacsclient -e '(something)'"},
 		},
 		{
-			name:    "command with multiple %s",
-			command: "echo %s %s",
-			event: config.IDLEEvent{
-				Mailbox: "INBOX",
-			},
+			name:     "command with multiple %s",
+			command:  "echo %s %s",
+			mailbox:  "INBOX",
 			wantArgs: []string{"sh", "-c", "echo INBOX %!s(MISSING)"},
 		},
 		{
 			name:     "command with pipes",
 			command:  "echo hello | grep hello",
-			event:    config.IDLEEvent{},
 			wantArgs: []string{"sh", "-c", "echo hello | grep hello"},
 		},
 		{
 			name:     "command with semicolon",
 			command:  "echo first; echo second",
-			event:    config.IDLEEvent{},
 			wantArgs: []string{"sh", "-c", "echo first; echo second"},
 		},
 		{
 			name:     "command with environment variable",
 			command:  "echo $HOME",
-			event:    config.IDLEEvent{},
 			wantArgs: []string{"sh", "-c", "echo $HOME"},
 		},
 		{
-			name:    "command with special mailbox name",
-			command: "mbsync '%s'",
-			event: config.IDLEEvent{
-				Mailbox: "INBOX/Subfolder",
-			},
+			name:     "command with special mailbox name",
+			command:  "mbsync '%s'",
+			mailbox:  "INBOX/Subfolder",
 			wantArgs: []string{"sh", "-c", "mbsync 'INBOX/Subfolder'"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := PrepareCommand(tt.command, tt.event)
+			cmd := PrepareCommand(tt.command, tt.mailbox)
 
 			if !reflect.DeepEqual(cmd.Args, tt.wantArgs) {
 				t.Errorf("PrepareCommand() Args = %v, want %v", cmd.Args, tt.wantArgs)
@@ -100,7 +87,7 @@ func TestPrepareCommand(t *testing.T) {
 }
 
 func TestPrepareCommand_ReturnsValidCmd(t *testing.T) {
-	cmd := PrepareCommand("echo test", config.IDLEEvent{})
+	cmd := PrepareCommand("echo test", "")
 
 	if cmd == nil {
 		t.Fatal("PrepareCommand() returned nil")
@@ -113,7 +100,7 @@ func TestPrepareCommand_ReturnsValidCmd(t *testing.T) {
 }
 
 func TestPrepareCommand_StdoutStderrAreNil(t *testing.T) {
-	cmd := PrepareCommand("echo test", config.IDLEEvent{})
+	cmd := PrepareCommand("echo test", "")
 
 	if cmd.Stdout != nil {
 		t.Error("PrepareCommand() Stdout should be nil")
@@ -124,7 +111,7 @@ func TestPrepareCommand_StdoutStderrAreNil(t *testing.T) {
 }
 
 func TestPrepareCommand_CanExecute(t *testing.T) {
-	cmd := PrepareCommand("echo hello", config.IDLEEvent{})
+	cmd := PrepareCommand("echo hello", "")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -137,11 +124,7 @@ func TestPrepareCommand_CanExecute(t *testing.T) {
 }
 
 func TestPrepareCommand_WithMailboxSubstitution(t *testing.T) {
-	event := config.IDLEEvent{
-		Mailbox: "TestMailbox",
-	}
-
-	cmd := PrepareCommand("echo %s", event)
+	cmd := PrepareCommand("echo %s", "TestMailbox")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -154,12 +137,8 @@ func TestPrepareCommand_WithMailboxSubstitution(t *testing.T) {
 }
 
 func TestPrepareCommand_WithoutSubstitution(t *testing.T) {
-	event := config.IDLEEvent{
-		Mailbox: "INBOX",
-	}
-
 	// Command without %s should not substitute
-	cmd := PrepareCommand("echo static", event)
+	cmd := PrepareCommand("echo static", "INBOX")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -174,18 +153,14 @@ func TestPrepareCommand_WithoutSubstitution(t *testing.T) {
 // TestBugArgs is the original test (kept for compatibility)
 func TestBugArgs(t *testing.T) {
 	args := []string{"sh", "-c", "emacsclient -e '(something)'"}
-	cmd := PrepareCommand("emacsclient -e '(something)'", config.IDLEEvent{})
+	cmd := PrepareCommand("emacsclient -e '(something)'", "")
 	if !reflect.DeepEqual(cmd.Args, args) {
 		t.Errorf("*cmd.Args are %+v, expected %+v", cmd.Args, args)
 	}
 }
 
 func TestPrepareCommand_EmptyMailbox(t *testing.T) {
-	event := config.IDLEEvent{
-		Mailbox: "",
-	}
-
-	cmd := PrepareCommand("echo '%s'", event)
+	cmd := PrepareCommand("echo '%s'", "")
 
 	// Should still work with empty mailbox
 	output, err := cmd.Output()
@@ -212,11 +187,7 @@ func TestPrepareCommand_SpecialCharactersInMailbox(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			event := config.IDLEEvent{
-				Mailbox: tc.mailbox,
-			}
-
-			cmd := PrepareCommand("echo %s", event)
+			cmd := PrepareCommand("echo %s", tc.mailbox)
 
 			// Command should at least be created without error
 			if cmd == nil {

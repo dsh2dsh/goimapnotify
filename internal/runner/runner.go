@@ -57,7 +57,8 @@ func NewRunningBox(debug bool, wait int) *RunningBox {
 func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue chan imap.IDLEEvent) {
 	l := slog.With(
 		slog.String("alias", rsp.Alias),
-		slog.String("mailbox", rsp.Mailbox))
+		slog.String("mailbox", rsp.Mailbox),
+	)
 	if ShouldSkip(rsp.Box) {
 		l.Warn("No command for event, skipping scheduling...",
 			slog.String("reason", rsp.Reason.String()))
@@ -104,7 +105,8 @@ func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue ch
 func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
 	l := slog.With(
 		slog.String("alias", rsp.Alias),
-		slog.String("mailbox", rsp.Mailbox))
+		slog.String("mailbox", rsp.Mailbox),
+	)
 	if r.Debug {
 		l.Info("Running synchronization...")
 	}
@@ -163,12 +165,7 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call := util.PrepareCommand(bufOn.String(), config.IDLEEvent{
-		Alias:   event.Alias,
-		Mailbox: event.Mailbox,
-		Reason:  event.Reason,
-		Box:     event.Box,
-	})
+	call := util.PrepareCommand(bufOn.String(), event.Mailbox)
 	out, err := call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -192,12 +189,7 @@ func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call = util.PrepareCommand(bufOnPost.String(), config.IDLEEvent{
-		Alias:   event.Alias,
-		Mailbox: event.Mailbox,
-		Reason:  event.Reason,
-		Box:     event.Box,
-	})
+	call = util.PrepareCommand(bufOnPost.String(), event.Mailbox)
 	out, err = call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {

@@ -7,7 +7,6 @@ import (
 	"github.com/emersion/go-imap/client"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
-	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 // IDLE wraps the IMAP client with IDLE support
@@ -18,8 +17,7 @@ type IDLE struct {
 
 // NewIDLE creates a new IMAP client with IDLE support
 func NewIDLE(conf config.NotifyConfig, retries int) (*IDLE, error) {
-	confCMDExecuted := util.RetrieveCmd(conf)
-	i, err := New(confCMDExecuted, retries)
+	i, err := New(conf, retries)
 	if err != nil {
 		return nil, err
 	}

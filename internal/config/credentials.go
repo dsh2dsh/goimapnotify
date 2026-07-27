@@ -1,6 +1,4 @@
-//go:build windows
-
-package util
+package config
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025  Jorge Javier Araya Navarro
@@ -19,26 +17,32 @@ package util
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
-// PrepareCommand parses a string and returns a command executable by Go
-func PrepareCommand(command, mailbox string) *exec.Cmd {
-	var commandstr string
-	if strings.Contains(command, "%s") {
-		commandstr = fmt.Sprintf(command, mailbox)
-	} else {
-		commandstr = command
+// RetrieveCmd executes all credential commands and updates the config
+func (self *NotifyConfig) RetrieveCmd() {
+	self.Password = retrieveCmd(self.PasswordCMD, self.Password)
+	self.Username = retrieveCmd(self.UsernameCMD, self.Username)
+	self.Host = retrieveCmd(self.HostCMD, self.Host)
+}
+
+func retrieveCmd(cmdLine, def string) string {
+	if cmdLine == "" {
+		return def
 	}
 
-	commandsplt := append([]string{"cmd", "/c"}, commandstr)
-	slog.Debug("Command: " + strings.Join(commandsplt, " "))
-	// #nosec
-	cmd := exec.Command(commandsplt[0], commandsplt[1:]...)
-	cmd.Stdout = os.Stdout
-	return cmd
+	cmd := util.PrepareCommand(cmdLine, "")
+	// Avoid leaking the password
+	cmd.Stdout = nil
+	buf, err := cmd.Output()
+	if err != nil {
+		slog.Error("cannot retrieve password from command", slog.Any("error", err))
+		os.Exit(1)
+	}
+	return strings.Trim(string(buf), "\n")
 }

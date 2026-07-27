@@ -23,15 +23,13 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
-
-	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // PrepareCommand parses a string and returns a command executable by Go
-func PrepareCommand(command string, rsp config.IDLEEvent) *exec.Cmd {
+func PrepareCommand(command, mailbox string) *exec.Cmd {
 	var commandstr string
 	if strings.Contains(command, "%s") {
-		commandstr = fmt.Sprintf(command, rsp.Mailbox)
+		commandstr = fmt.Sprintf(command, mailbox)
 	} else {
 		commandstr = command
 	}
