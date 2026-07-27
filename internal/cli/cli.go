@@ -174,7 +174,7 @@ func Run() error {
 			key := account.Alias + mailbox.Mailbox
 			running.Config[key] = account
 
-			client, err := imap.NewIMAPIDLEClient(account, flagRetries)
+			client, err := imap.NewIDLE(account, flagRetries)
 			if err != nil {
 				slog.Warn("Initial connection failed, retrying in background",
 					slog.String("account", account.Alias), slog.Any("error", err))
@@ -267,7 +267,7 @@ func loadConfiguration(filename string, retries int,
 		}
 
 		// If there is no mailboxes, watch over all mailboxes of the account
-		client, err := imap.NewIMAPIDLEClient(*conf, retries)
+		client, err := imap.NewIDLE(*conf, retries)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"account %q, failed to create IMAP client, error: %w",
@@ -334,7 +334,7 @@ func reconnectWatcher(
 		default:
 		}
 
-		client, err := imap.NewIMAPIDLEClient(cfg, retries)
+		client, err := imap.NewIDLE(cfg, retries)
 		if err != nil {
 			if isAuthError(err) && backoff < 30*time.Second {
 				backoff = 30 * time.Second

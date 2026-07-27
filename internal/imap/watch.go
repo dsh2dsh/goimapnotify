@@ -45,11 +45,31 @@ type BoxEvent struct {
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	client    *IMAPIDLEClient
+	client    *IDLE
 	box       config.Box
 	idleEvent chan<- IDLEEvent
 	boxEvent  chan<- BoxEvent
 	quit      <-chan struct{}
+}
+
+// NewWatchBox creates a new instance of WatchMailBox and launches it
+func NewWatchBox(
+	c *IDLE,
+	f config.NotifyConfig,
+	m config.Box,
+	i chan<- IDLEEvent,
+	b chan<- BoxEvent,
+	q <-chan struct{},
+	wg *sync.WaitGroup,
+) {
+	w := WatchMailBox{
+		client:    c,
+		box:       m,
+		idleEvent: i,
+		boxEvent:  b,
+		quit:      q,
+	}
+	wg.Go(w.Watch)
 }
 
 // Watch starts watching the mailbox for IDLE events
@@ -155,24 +175,4 @@ func (w *WatchMailBox) Watch() {
 			w.boxEvent <- BoxEvent{UniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
 		}
 	}
-}
-
-// NewWatchBox creates a new instance of WatchMailBox and launches it
-func NewWatchBox(
-	c *IMAPIDLEClient,
-	f config.NotifyConfig,
-	m config.Box,
-	i chan<- IDLEEvent,
-	b chan<- BoxEvent,
-	q <-chan struct{},
-	wg *sync.WaitGroup,
-) {
-	w := WatchMailBox{
-		client:    c,
-		box:       m,
-		idleEvent: i,
-		boxEvent:  b,
-		quit:      q,
-	}
-	wg.Go(w.Watch)
 }

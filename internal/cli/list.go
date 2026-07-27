@@ -23,11 +23,12 @@ var listCmd = cobra.Command{
 
 func listMailboxes(topConfig *config.Configuration) error {
 	for _, account := range topConfig.Configurations {
-		client, err := imap.NewClient(account, flagRetries)
+		client, err := imap.New(account, flagRetries)
 		if err != nil {
 			return fmt.Errorf(
 				"something went wrong creating IMAP client, account=%s: %w",
-				account.Alias, err)
+				account.Alias, err,
+			)
 		}
 		defer client.Logout()
 
@@ -35,7 +36,8 @@ func listMailboxes(topConfig *config.Configuration) error {
 		if err != nil {
 			return fmt.Errorf(
 				"listing mailboxes finished with error, account=%s: %w",
-				account.Alias, err)
+				account.Alias, err,
+			)
 		}
 
 		slog.Info("walking through the account mailboxes",
@@ -44,7 +46,8 @@ func listMailboxes(topConfig *config.Configuration) error {
 		if err != nil {
 			return fmt.Errorf(
 				"something went wrong while walking on the account listing all mailboxes, account=%s: %w",
-				account.Alias, err)
+				account.Alias, err,
+			)
 		}
 	}
 	return nil

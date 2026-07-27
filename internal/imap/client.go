@@ -30,7 +30,6 @@ import (
 	"time"
 
 	imapid "github.com/emersion/go-imap-id"
-	idle "github.com/emersion/go-imap-idle"
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-sasl"
 
@@ -41,14 +40,8 @@ import (
 // Version is set at build time
 var Version string = "unknown"
 
-// IMAPIDLEClient wraps the IMAP client with IDLE support
-type IMAPIDLEClient struct {
-	*client.Client
-	*idle.IdleClient
-}
-
-// NewClient creates a new IMAP client with the given configuration.
-func NewClient(conf config.NotifyConfig, retries int,
+// New creates a new IMAP client with the given configuration.
+func New(conf config.NotifyConfig, retries int,
 ) (c *client.Client, err error) {
 	server := conf.Host + ":" + strconv.Itoa(conf.Port)
 
@@ -177,23 +170,4 @@ func NewClient(conf config.NotifyConfig, retries int,
 		}
 	}
 	return c, nil
-}
-
-// NewIMAPIDLEClient creates a new IMAP client with IDLE support
-func NewIMAPIDLEClient(conf config.NotifyConfig, retries int) (*IMAPIDLEClient, error) {
-	confCMDExecuted := util.RetrieveCmd(conf)
-	i, err := NewClient(confCMDExecuted, retries)
-	if err != nil {
-		return nil, err
-	}
-
-	idleC := idle.NewClient(i)
-
-	amount := 25 // default per https://github.com/emersion/go-imap-idle/blob/db256843144576c70e551f0732f1d1d3b5bec67e/client.go#L11
-	if conf.IDLELogoutTimeout > 0 {
-		amount = conf.IDLELogoutTimeout
-	}
-	idleC.LogoutTimeout = time.Duration(amount) * time.Minute
-
-	return &IMAPIDLEClient{i, idleC}, nil
 }
