@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
-	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
@@ -54,7 +53,7 @@ func NewRunningBox(debug bool, wait int) *RunningBox {
 }
 
 // Schedule debounces events before queueing them for execution
-func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue chan imap.IDLEEvent) {
+func (r *RunningBox) Schedule(rsp config.IDLEEvent, done <-chan struct{}, queue chan config.IDLEEvent) {
 	l := slog.With(
 		slog.String("alias", rsp.Alias),
 		slog.String("mailbox", rsp.Mailbox),
@@ -102,7 +101,7 @@ func (r *RunningBox) Schedule(rsp imap.IDLEEvent, done <-chan struct{}, queue ch
 }
 
 // Run executes commands based on the event type
-func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
+func (r *RunningBox) Run(rsp config.IDLEEvent) error {
 	l := slog.With(
 		slog.String("alias", rsp.Alias),
 		slog.String("mailbox", rsp.Mailbox),
@@ -139,7 +138,7 @@ func (r *RunningBox) Run(rsp imap.IDLEEvent) error {
 	return nil
 }
 
-func prepareAndRun(on, onpost string, event imap.IDLEEvent) error {
+func prepareAndRun(on, onpost string, event config.IDLEEvent) error {
 	callKind := "New"
 	if event.Reason == config.DELETEDMAIL {
 		callKind = "Deleted"

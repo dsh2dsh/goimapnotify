@@ -121,7 +121,7 @@ type Box struct {
 	ExistingEmail     uint32    `json:"-"                 yaml:"-"`
 }
 
-// IDLEEvent models an IDLE event (needed for template compilation test)
+// IDLEEvent models an IDLE event
 type IDLEEvent struct {
 	Alias         string
 	Mailbox       string

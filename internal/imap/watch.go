@@ -27,15 +27,6 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
-// IDLEEvent models an IDLE event
-type IDLEEvent struct {
-	Alias         string
-	Mailbox       string
-	Reason        config.EventType
-	ExistingEmail int
-	Box           config.Box
-}
-
 // BoxEvent helps in communication between the box watch launcher and the box
 // watching goroutines
 type BoxEvent struct {
@@ -47,7 +38,7 @@ type BoxEvent struct {
 type WatchMailBox struct {
 	client    *IDLE
 	box       config.Box
-	idleEvent chan<- IDLEEvent
+	idleEvent chan<- config.IDLEEvent
 	boxEvent  chan<- BoxEvent
 	quit      <-chan struct{}
 }
@@ -57,7 +48,7 @@ func NewWatchBox(
 	c *IDLE,
 	f config.NotifyConfig,
 	m config.Box,
-	i chan<- IDLEEvent,
+	i chan<- config.IDLEEvent,
 	b chan<- BoxEvent,
 	q <-chan struct{},
 	wg *sync.WaitGroup,
@@ -104,7 +95,7 @@ func (w *WatchMailBox) Watch() {
 	// issue fake event to trigger a first time sync
 	go func() {
 		l.Info("issuing fake IMAP Event for first time sync (skipping post-commands)")
-		w.idleEvent <- IDLEEvent{
+		w.idleEvent <- config.IDLEEvent{
 			Alias:         w.box.Alias,
 			Mailbox:       w.box.Mailbox,
 			Reason:        config.SYNC,
@@ -127,7 +118,7 @@ func (w *WatchMailBox) Watch() {
 				// from the server.
 				if mu.Mailbox.Messages > w.box.ExistingEmail {
 					// messages arrived
-					w.idleEvent <- IDLEEvent{
+					w.idleEvent <- config.IDLEEvent{
 						Alias:         w.box.Alias,
 						Mailbox:       w.box.Mailbox,
 						Reason:        config.NEWMAIL,
@@ -140,7 +131,7 @@ func (w *WatchMailBox) Watch() {
 			_, ok = update.(*client.MessageUpdate)
 			if ok {
 				// messages flags updated
-				w.idleEvent <- IDLEEvent{
+				w.idleEvent <- config.IDLEEvent{
 					Alias:   w.box.Alias,
 					Mailbox: w.box.Mailbox,
 					Reason:  config.FLAGCHANGED,
@@ -150,7 +141,7 @@ func (w *WatchMailBox) Watch() {
 			_, ok = update.(*client.ExpungeUpdate)
 			if ok {
 				// messages deleted
-				w.idleEvent <- IDLEEvent{
+				w.idleEvent <- config.IDLEEvent{
 					Alias:   w.box.Alias,
 					Mailbox: w.box.Mailbox,
 					Reason:  config.DELETEDMAIL,

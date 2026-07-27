@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
-	"github.com/dsh2dsh/goimapnotify/internal/imap"
 )
 
 // TestNewRunningBox tests the NewRunningBox constructor
@@ -177,7 +176,7 @@ func TestShouldSkip(t *testing.T) {
 func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -188,7 +187,7 @@ func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	queue := make(chan imap.IDLEEvent, 1)
+	queue := make(chan config.IDLEEvent, 1)
 
 	// Run Schedule in a goroutine
 	var wg sync.WaitGroup
@@ -213,7 +212,7 @@ func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 	rb := NewRunningBox(false, 0) // 0 second wait for fast test
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -224,7 +223,7 @@ func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	queue := make(chan imap.IDLEEvent, 1)
+	queue := make(chan config.IDLEEvent, 1)
 
 	// Run Schedule in a goroutine
 	go rb.Schedule(event, done, queue)
@@ -249,7 +248,7 @@ func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 func TestRunningBox_Schedule_Debouncing(t *testing.T) {
 	rb := NewRunningBox(false, 1) // 1 second wait
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -260,7 +259,7 @@ func TestRunningBox_Schedule_Debouncing(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	queue := make(chan imap.IDLEEvent, 10)
+	queue := make(chan config.IDLEEvent, 10)
 
 	// Start multiple Schedule calls rapidly
 	for range 5 {
@@ -295,7 +294,7 @@ drainLoop:
 func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 	rb := NewRunningBox(false, 10) // Long wait time
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -306,7 +305,7 @@ func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	queue := make(chan imap.IDLEEvent, 1)
+	queue := make(chan config.IDLEEvent, 1)
 
 	// Run Schedule in a goroutine
 	scheduleReturned := make(chan struct{})
@@ -342,7 +341,7 @@ func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 	rb := NewRunningBox(false, 0) // 0 second wait for fast test
 
-	event1 := imap.IDLEEvent{
+	event1 := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -352,7 +351,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 		},
 	}
 
-	event2 := imap.IDLEEvent{
+	event2 := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "Sent",
 		Reason:  config.NEWMAIL,
@@ -363,7 +362,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 	}
 
 	done := make(chan struct{})
-	queue := make(chan imap.IDLEEvent, 10)
+	queue := make(chan config.IDLEEvent, 10)
 
 	// Schedule events for different mailboxes
 	go rb.Schedule(event1, done, queue)
@@ -396,7 +395,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 func TestRunningBox_Run_NewMail(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -417,7 +416,7 @@ func TestRunningBox_Run_NewMail(t *testing.T) {
 func TestRunningBox_Run_FlagChanged(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.FLAGCHANGED,
@@ -438,7 +437,7 @@ func TestRunningBox_Run_FlagChanged(t *testing.T) {
 func TestRunningBox_Run_DeletedMail(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.DELETEDMAIL,
@@ -459,7 +458,7 @@ func TestRunningBox_Run_DeletedMail(t *testing.T) {
 func TestRunningBox_Run_SkipsEmptyCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -480,7 +479,7 @@ func TestRunningBox_Run_SkipsEmptyCommand(t *testing.T) {
 func TestRunningBox_Run_SkipsSKIPCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -501,7 +500,7 @@ func TestRunningBox_Run_SkipsSKIPCommand(t *testing.T) {
 func TestRunningBox_Run_WithPostCommand(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -523,7 +522,7 @@ func TestRunningBox_Run_WithPostCommand(t *testing.T) {
 func TestRunningBox_Run_CommandFailure(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -544,7 +543,7 @@ func TestRunningBox_Run_CommandFailure(t *testing.T) {
 func TestRunningBox_Run_PostCommandFailure(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -566,7 +565,7 @@ func TestRunningBox_Run_PostCommandFailure(t *testing.T) {
 func TestRunningBox_Run_UnknownReason(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.EventType(99), // Unknown reason
@@ -585,7 +584,7 @@ func TestRunningBox_Run_UnknownReason(t *testing.T) {
 func TestRunningBox_Run_WithTemplate(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -607,7 +606,7 @@ func TestRunningBox_Run_WithTemplate(t *testing.T) {
 func TestRunningBox_Run_InvalidTemplate(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -628,7 +627,7 @@ func TestRunningBox_Run_InvalidTemplate(t *testing.T) {
 func TestRunningBox_Run_TemplateExecutionError(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -648,7 +647,7 @@ func TestRunningBox_Run_TemplateExecutionError(t *testing.T) {
 func TestRunningBox_Run_PostCommandSkipped(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -670,7 +669,7 @@ func TestRunningBox_Run_PostCommandSkipped(t *testing.T) {
 func TestRunningBox_Run_PostCommandEmpty(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := imap.IDLEEvent{
+	event := config.IDLEEvent{
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
@@ -727,7 +726,7 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rb := NewRunningBox(false, 1)
-			event := imap.IDLEEvent{
+			event := config.IDLEEvent{
 				Alias:   "test@example.com",
 				Mailbox: "INBOX",
 				Reason:  tt.reason,
@@ -772,10 +771,10 @@ func TestRunningBox_Schedule_TimerMapIsolation(t *testing.T) {
 	users := []string{"user1@example.com", "user2@example.com", "user3@example.com"}
 
 	done := make(chan struct{})
-	queue := make(chan imap.IDLEEvent, 10)
+	queue := make(chan config.IDLEEvent, 10)
 
 	for _, user := range users {
-		event := imap.IDLEEvent{
+		event := config.IDLEEvent{
 			Alias:   user,
 			Mailbox: "INBOX",
 			Reason:  config.NEWMAIL,

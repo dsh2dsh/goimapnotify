@@ -146,8 +146,8 @@ func Run() error {
 		slog.String("tag", gittag),
 		slog.String("branch", branch))
 
-	idleChan := make(chan imap.IDLEEvent)
-	queueChan := make(chan imap.IDLEEvent, 100)
+	idleChan := make(chan config.IDLEEvent)
+	queueChan := make(chan config.IDLEEvent, 100)
 	boxChan := make(chan imap.BoxEvent, 1)
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
@@ -309,7 +309,7 @@ func loadConfiguration(filename string, retries int,
 func reconnectWatcher(
 	event imap.BoxEvent,
 	cfg config.NotifyConfig,
-	idleChan chan<- imap.IDLEEvent,
+	idleChan chan<- config.IDLEEvent,
 	boxChan chan<- imap.BoxEvent,
 	quitChan <-chan struct{},
 	wg *sync.WaitGroup,
