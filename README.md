@@ -150,17 +150,27 @@ go install github.com/dsh2dsh/goimapnotify@latest
 ## Usage
 
 ```
-Usage of goimapnotify:
-  -conf string
-        Configuration file (default "$XDG_CONFIG_HOME/goimapnotify/goimapnotify.yaml")
-  -dial-retry-attempts int
-        Number of attempts when connecting to an IMAP server, using exponential backoff (default 5)
-  -list
-        List all mailboxes and exit
-  -log-level string
-        Change the logging level; possible values are: error, warn, info, debug (default "info")
-  -wait int
-        Delay in seconds between the IDLE event and the execution of the scripts (default 1)
+goimapnotify executes scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE.
+
+Usage:
+  goimapnotify [flags]
+  goimapnotify [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  list        List all mailboxes and exit
+
+Flags:
+  -c, --conf string               Configuration file (default "/home/dsh/.config/goimapnotify/goimapnotify.yaml")
+  -r, --dial-retry-attempts int   number of attempts when connecting to an IMAP server, using exponential backoff (default 5)
+  -h, --help                      help for goimapnotify
+      --list                      List all mailboxes and exit
+  -l, --log-level string          change the logging level (error|warn|info|debug) (default "info")
+  -s, --syslog                    send log output to syslog instead of stderr
+  -w, --wait int                  delay in seconds between the IDLE event and the execution of the scripts (default 1)
+
+Use "goimapnotify [command] --help" for more information about a command.
 ```
 
 As you can notice, `-list` can help you figure out the mailbox hierarchy of your
