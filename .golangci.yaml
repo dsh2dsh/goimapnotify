@@ -66,7 +66,8 @@ linters:
         - "(net.Listener).Close"
         - "(*os.File).Close"
         - "(io/fs.File).Close"
-        - "(*github.com/emersion/go-imap/client.Client).Logout"
+        - "(*github.com/emersion/go-imap/v2/imapclient.Client).Close"
+        - "(*github.com/emersion/go-imap/v2/imapclient.IdleCommand).Close"
 
       # Display function signature instead of selector.
       # Default: false

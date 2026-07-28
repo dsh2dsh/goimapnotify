@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/emersion/go-imap/client"
+	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
@@ -31,7 +31,7 @@ func listMailboxes(topConfig *config.Configuration) error {
 				account.Alias, err,
 			)
 		}
-		defer client.Logout()
+		defer client.Close()
 
 		mailboxCount, err := printDelimiter(client)
 		if err != nil {
@@ -57,7 +57,7 @@ func listMailboxes(topConfig *config.Configuration) error {
 }
 
 // printDelimiter prints the hierarchy delimiter and returns mailbox count
-func printDelimiter(c *client.Client) (int, error) {
+func printDelimiter(c *imapclient.Client) (int, error) {
 	var count int
 	var delimiter string
 
@@ -66,7 +66,7 @@ func printDelimiter(c *client.Client) (int, error) {
 			return 0, err
 		}
 		if count == 0 {
-			delimiter = m.Delimiter
+			delimiter = string(m.Delim)
 		}
 		count++
 	}
@@ -76,14 +76,14 @@ func printDelimiter(c *client.Client) (int, error) {
 }
 
 // printMailbox recursively lists mailboxes with tree visualization
-func printMailbox(c *client.Client, mailboxCount int) error {
+func printMailbox(c *imapclient.Client, mailboxCount int) error {
 	var pos int
 	for m, err := range imap.Mailboxes(c) {
 		if err != nil {
 			return err
 		}
 		box := boxchar(pos, 0, mailboxCount-1)
-		fmt.Println(box, m.Name)
+		fmt.Println(box, m.Mailbox)
 		pos++
 	}
 	return nil

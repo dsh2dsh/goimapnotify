@@ -22,12 +22,6 @@ import (
 	"testing"
 )
 
-func TestXoauth2Constant(t *testing.T) {
-	if Xoauth2 != "XOAUTH2" {
-		t.Errorf("Xoauth2 constant = %q, want %q", Xoauth2, "XOAUTH2")
-	}
-}
-
 func TestNewXoauth2Client(t *testing.T) {
 	client := NewXoauth2Client("user@example.com", "token123")
 	if client == nil {
