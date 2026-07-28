@@ -18,7 +18,7 @@ package config
 
 // Configuration holds the top-level configuration
 type Configuration struct {
-	Configurations []NotifyConfig `yaml:"configurations" json:"configurations"`
+	Configurations []*NotifyConfig `yaml:"configurations" json:"configurations"`
 }
 
 // ConfigurationLegacy holds the old configuration format
@@ -65,7 +65,7 @@ type NotifyConfig struct {
 	OnChangedMailPost string           `yaml:"onChangedMailPost" json:"onChangedMailPost"`
 	OnDeletedMail     string           `yaml:"onDeletedMail"     json:"onDeletedMail"`
 	OnDeletedMailPost string           `yaml:"onDeletedMailPost" json:"onDeletedMailPost"`
-	Boxes             []Box            `yaml:"boxes"             json:"boxes"`
+	Boxes             []*Box           `yaml:"boxes"             json:"boxes"`
 }
 
 // TLSOptionsStruct holds TLS configuration options

@@ -57,9 +57,11 @@ func compileTemplate(s string) error {
 		return fmt.Errorf("config: parse template: %w", err)
 	}
 
+	var box Box
 	input := IDLEEvent{
 		Alias:   "example@example.com",
 		Mailbox: "Inbox",
+		Box:     &box,
 	}
 
 	if err := t.Execute(io.Discard, &input); err != nil {

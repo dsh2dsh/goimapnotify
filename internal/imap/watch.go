@@ -31,13 +31,13 @@ import (
 // watching goroutines
 type BoxEvent struct {
 	UniqID  string
-	Mailbox config.Box
+	Mailbox *config.Box
 }
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
 	client    *client.Client
-	box       config.Box
+	box       *config.Box
 	idleEvent chan<- config.IDLEEvent
 	boxEvent  chan<- BoxEvent
 	quit      <-chan struct{}
@@ -46,8 +46,8 @@ type WatchMailBox struct {
 // NewWatchBox creates a new instance of WatchMailBox and launches it
 func NewWatchBox(
 	c *client.Client,
-	f config.NotifyConfig,
-	m config.Box,
+	f *config.NotifyConfig,
+	m *config.Box,
 	i chan<- config.IDLEEvent,
 	b chan<- BoxEvent,
 	q <-chan struct{},

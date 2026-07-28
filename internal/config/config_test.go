@@ -113,7 +113,7 @@ func TestLegacyConverter(t *testing.T) {
 		Boxes:             []string{"INBOX", "Sent", "Drafts"},
 	}
 
-	result := LegacyConverter(legacy)
+	result := LegacyConverter(&legacy)
 
 	if len(result) != 1 {
 		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result))
@@ -213,7 +213,7 @@ func TestLegacyConverter_EmptyBoxes(t *testing.T) {
 		Boxes: []string{},
 	}
 
-	result := LegacyConverter(legacy)
+	result := LegacyConverter(&legacy)
 
 	if len(result) != 1 {
 		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result))
@@ -228,7 +228,7 @@ func TestLegacyConverter_EmptyBoxes(t *testing.T) {
 func TestLegacyConverter_MinimalConfig(t *testing.T) {
 	legacy := ConfigurationLegacy{}
 
-	result := LegacyConverter(legacy)
+	result := LegacyConverter(&legacy)
 
 	if len(result) != 1 {
 		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result))
@@ -252,7 +252,7 @@ func TestNotifyConfig_JSONSerialization(t *testing.T) {
 		TLS:      true,
 		Username: "user@example.com",
 		Password: "secret",
-		Boxes: []Box{
+		Boxes: []*Box{
 			{Mailbox: "INBOX", OnNewMail: "echo new"},
 			{Mailbox: "Sent", OnNewMail: "echo sent"},
 		},
@@ -298,7 +298,7 @@ func TestNotifyConfig_YAMLSerialization(t *testing.T) {
 			RejectUnauthorized: true,
 			STARTTLS:           false,
 		},
-		Boxes: []Box{
+		Boxes: []*Box{
 			{Mailbox: "INBOX", OnNewMail: "echo new"},
 		},
 	}
@@ -332,7 +332,7 @@ func TestNotifyConfig_YAMLSerialization(t *testing.T) {
 // TestConfiguration_JSONSerialization tests Configuration JSON serialization
 func TestConfiguration_JSONSerialization(t *testing.T) {
 	original := Configuration{
-		Configurations: []NotifyConfig{
+		Configurations: []*NotifyConfig{
 			{
 				Host:     "imap1.example.com",
 				Port:     993,
@@ -469,7 +469,7 @@ func TestIDLEEvent(t *testing.T) {
 		Mailbox:       "INBOX",
 		Reason:        NEWMAIL,
 		ExistingEmail: 10,
-		Box: Box{
+		Box: &Box{
 			Mailbox:   "INBOX",
 			OnNewMail: "echo new",
 		},
@@ -555,7 +555,7 @@ func TestNotifyConfig_AllFields(t *testing.T) {
 		OnChangedMailPost: "changed post",
 		OnDeletedMail:     "deleted",
 		OnDeletedMailPost: "deleted post",
-		Boxes:             []Box{{Mailbox: "INBOX"}},
+		Boxes:             []*Box{{Mailbox: "INBOX"}},
 	}
 
 	// Verify it can be serialized and deserialized

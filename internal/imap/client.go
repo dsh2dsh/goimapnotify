@@ -41,7 +41,7 @@ import (
 var Version string = "unknown"
 
 // New creates a new IMAP client with the given configuration.
-func New(conf config.NotifyConfig, retries int,
+func New(conf *config.NotifyConfig, retries int,
 ) (c *client.Client, err error) {
 	server := conf.Host + ":" + strconv.Itoa(conf.Port)
 

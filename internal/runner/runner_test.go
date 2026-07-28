@@ -164,7 +164,7 @@ func TestShouldSkip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ShouldSkip(tt.box)
+			result := ShouldSkip(&tt.box)
 			if result != tt.expected {
 				t.Errorf("ShouldSkip() = %v, want %v", result, tt.expected)
 			}
@@ -180,7 +180,7 @@ func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Reason:    config.NEWMAIL,
 			OnNewMail: "", // Empty - should skip
 		},
@@ -216,7 +216,7 @@ func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo hello",
 		},
@@ -252,7 +252,7 @@ func TestRunningBox_Schedule_Debouncing(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo hello",
 		},
@@ -298,7 +298,7 @@ func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo hello",
 		},
@@ -345,7 +345,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo inbox",
 		},
@@ -355,7 +355,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "Sent",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo sent",
 		},
@@ -399,7 +399,7 @@ func TestRunningBox_Run_NewMail(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo 'new mail'",
@@ -420,7 +420,7 @@ func TestRunningBox_Run_FlagChanged(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.FLAGCHANGED,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:       "INBOX",
 			Reason:        config.FLAGCHANGED,
 			OnChangedMail: "echo 'flag changed'",
@@ -441,7 +441,7 @@ func TestRunningBox_Run_DeletedMail(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.DELETEDMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:       "INBOX",
 			Reason:        config.DELETEDMAIL,
 			OnDeletedMail: "echo 'deleted mail'",
@@ -462,7 +462,7 @@ func TestRunningBox_Run_SkipsEmptyCommand(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Reason:    config.NEWMAIL,
 			OnNewMail: "", // Empty command
@@ -483,7 +483,7 @@ func TestRunningBox_Run_SkipsSKIPCommand(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Reason:    config.NEWMAIL,
 			OnNewMail: "SKIP",
@@ -504,7 +504,7 @@ func TestRunningBox_Run_WithPostCommand(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:       "INBOX",
 			Reason:        config.NEWMAIL,
 			OnNewMail:     "echo 'new mail'",
@@ -526,7 +526,7 @@ func TestRunningBox_Run_CommandFailure(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Reason:    config.NEWMAIL,
 			OnNewMail: "exit 1", // Command that fails
@@ -547,7 +547,7 @@ func TestRunningBox_Run_PostCommandFailure(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:       "INBOX",
 			Reason:        config.NEWMAIL,
 			OnNewMail:     "echo 'success'",
@@ -569,7 +569,7 @@ func TestRunningBox_Run_UnknownReason(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.EventType(99), // Unknown reason
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox: "INBOX",
 		},
 	}
@@ -588,7 +588,7 @@ func TestRunningBox_Run_WithTemplate(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Alias:     "test@example.com",
 			Reason:    config.NEWMAIL,
@@ -610,7 +610,7 @@ func TestRunningBox_Run_InvalidTemplate(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo '{{.InvalidField'", // Invalid template syntax
@@ -631,7 +631,7 @@ func TestRunningBox_Run_TemplateExecutionError(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:   "INBOX",
 			Reason:    config.NEWMAIL,
 			OnNewMail: "echo '{{.NonExistentMethod}}'", // Valid syntax but will cause execution issues
@@ -651,7 +651,7 @@ func TestRunningBox_Run_PostCommandSkipped(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:       "INBOX",
 			Reason:        config.NEWMAIL,
 			OnNewMail:     "echo 'new mail'",
@@ -673,7 +673,7 @@ func TestRunningBox_Run_PostCommandEmpty(t *testing.T) {
 		Alias:   "test@example.com",
 		Mailbox: "INBOX",
 		Reason:  config.NEWMAIL,
-		Box: config.Box{
+		Box: &config.Box{
 			Mailbox:       "INBOX",
 			Reason:        config.NEWMAIL,
 			OnNewMail:     "echo 'new mail'",
@@ -730,7 +730,7 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 				Alias:   "test@example.com",
 				Mailbox: "INBOX",
 				Reason:  tt.reason,
-				Box:     tt.box,
+				Box:     &tt.box,
 			}
 
 			err := rb.Run(event)
@@ -752,7 +752,7 @@ func TestRunningBox_Config(t *testing.T) {
 		Username: "test@example.com",
 	}
 
-	rb.Config["test@example.com"] = conf
+	rb.Config["test@example.com"] = &conf
 
 	retrieved, ok := rb.Config["test@example.com"]
 	if !ok {
@@ -778,7 +778,7 @@ func TestRunningBox_Schedule_TimerMapIsolation(t *testing.T) {
 			Alias:   user,
 			Mailbox: "INBOX",
 			Reason:  config.NEWMAIL,
-			Box: config.Box{
+			Box: &config.Box{
 				Reason:    config.NEWMAIL,
 				OnNewMail: "echo hello",
 			},

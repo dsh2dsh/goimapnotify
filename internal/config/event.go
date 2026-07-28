@@ -31,5 +31,5 @@ type IDLEEvent struct {
 	Mailbox       string
 	Reason        EventType
 	ExistingEmail int
-	Box           Box
+	Box           *Box
 }

@@ -239,8 +239,7 @@ func loadConfiguration(filename string, retries int,
 		return nil, err
 	}
 
-	for i := range cfg.Configurations {
-		conf := &cfg.Configurations[i]
+	for _, conf := range cfg.Configurations {
 		conf.RetrieveCmd()
 		if conf.Alias == "" {
 			conf.Alias = conf.Username
@@ -252,8 +251,7 @@ func loadConfiguration(filename string, retries int,
 		if len(conf.Boxes) != 0 {
 			// replace all listed mailboxes with the same mailboxes carrying values
 			// from the configuration
-			for i := range conf.Boxes {
-				mailbox := &conf.Boxes[i]
+			for _, mailbox := range conf.Boxes {
 				if err := conf.FillBox(mailbox); err != nil {
 					return nil, fmt.Errorf("template is invalid: %w", err)
 				}
@@ -262,7 +260,7 @@ func loadConfiguration(filename string, retries int,
 		}
 
 		// If there is no mailboxes, watch over all mailboxes of the account
-		c, err := imap.New(*conf, retries)
+		c, err := imap.New(conf, retries)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"account %q, failed to create IMAP client, error: %w",
@@ -284,8 +282,8 @@ func loadConfiguration(filename string, retries int,
 				}
 			}
 
-			box := config.Box{Mailbox: mailbox.Name}
-			if err := conf.FillBox(&box); err != nil {
+			box := &config.Box{Mailbox: mailbox.Name}
+			if err := conf.FillBox(box); err != nil {
 				return nil, fmt.Errorf("template is invalid: %w", err)
 			}
 			conf.Boxes = append(conf.Boxes, box)
@@ -296,7 +294,7 @@ func loadConfiguration(filename string, retries int,
 
 func reconnectWatcher(
 	event imap.BoxEvent,
-	cfg config.NotifyConfig,
+	cfg *config.NotifyConfig,
 	idleChan chan<- config.IDLEEvent,
 	boxChan chan<- imap.BoxEvent,
 	quitChan <-chan struct{},

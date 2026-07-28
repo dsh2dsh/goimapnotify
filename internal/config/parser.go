@@ -26,7 +26,7 @@ func LoadYAML(filename string) (*Configuration, error) {
 				filename, err)
 		}
 		slog.Info("legacy format configuration detected")
-		cfg.Configurations = LegacyConverter(legacy)
+		cfg.Configurations = LegacyConverter(&legacy)
 	}
 
 	invalid := len(cfg.Configurations) == 0 ||
@@ -40,8 +40,8 @@ func LoadYAML(filename string) (*Configuration, error) {
 }
 
 // LegacyConverter converts old format configuration to new format
-func LegacyConverter(legacy ConfigurationLegacy) []NotifyConfig {
-	c := NotifyConfig{
+func LegacyConverter(legacy *ConfigurationLegacy) []*NotifyConfig {
+	c := &NotifyConfig{
 		Host:              legacy.Host,
 		HostCMD:           legacy.HostCMD,
 		Port:              legacy.Port,
@@ -62,9 +62,9 @@ func LegacyConverter(legacy ConfigurationLegacy) []NotifyConfig {
 		EnableIDCommand:   legacy.EnableIDCommand,
 	}
 
-	c.Boxes = make([]Box, len(legacy.Boxes))
+	c.Boxes = make([]*Box, len(legacy.Boxes))
 	for i, mailbox := range legacy.Boxes {
-		c.Boxes[i] = Box{Mailbox: mailbox}
+		c.Boxes[i] = &Box{Mailbox: mailbox}
 	}
-	return []NotifyConfig{c}
+	return []*NotifyConfig{c}
 }

@@ -39,7 +39,7 @@ type RunningBox struct {
 	 * username-mailbox combination
 	 */
 	timer  sync.Map
-	Config map[string]config.NotifyConfig
+	Config map[string]*config.NotifyConfig
 }
 
 // NewRunningBox creates a new RunningBox instance
@@ -48,7 +48,7 @@ func NewRunningBox(debug bool, wait int) *RunningBox {
 		Debug:  debug,
 		Wait:   wait,
 		timer:  sync.Map{},
-		Config: make(map[string]config.NotifyConfig),
+		Config: make(map[string]*config.NotifyConfig),
 	}
 }
 
@@ -201,7 +201,7 @@ func prepareAndRun(on, onpost string, event config.IDLEEvent) error {
 }
 
 // ShouldSkip checks if the event should be skipped based on the Box configuration
-func ShouldSkip(b config.Box) bool {
+func ShouldSkip(b *config.Box) bool {
 	switch b.Reason {
 	case config.NEWMAIL:
 		return b.OnNewMail == "" || b.OnNewMail == "SKIP"
