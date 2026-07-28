@@ -72,7 +72,7 @@ func printDelimiter(c *client.Client) (int, error) {
 	}
 
 	fmt.Println("Hierarchy delimiter is:", delimiter)
-	return count - 1, nil
+	return count, nil
 }
 
 // printMailbox recursively lists mailboxes with tree visualization
@@ -82,7 +82,7 @@ func printMailbox(c *client.Client, mailboxCount int) error {
 		if err != nil {
 			return err
 		}
-		box := boxchar(pos, 0, mailboxCount)
+		box := boxchar(pos, 0, mailboxCount-1)
 		fmt.Println(box, m.Name)
 		pos++
 	}
