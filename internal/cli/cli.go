@@ -171,7 +171,7 @@ func Run() error {
 			key := account.Alias + mailbox.Mailbox
 			running.Config[key] = account
 
-			client, err := imap.NewIDLE(account, flagRetries)
+			client, err := imap.New(account, flagRetries)
 			if err != nil {
 				slog.Warn("Initial connection failed, retrying in background",
 					slog.String("account", account.Alias), slog.Any("error", err))
@@ -321,7 +321,7 @@ func reconnectWatcher(
 		default:
 		}
 
-		client, err := imap.NewIDLE(cfg, retries)
+		client, err := imap.New(cfg, retries)
 		if err != nil {
 			if isAuthError(err) && backoff < 30*time.Second {
 				backoff = 30 * time.Second

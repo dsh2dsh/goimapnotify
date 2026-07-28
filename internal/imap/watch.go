@@ -36,7 +36,7 @@ type BoxEvent struct {
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	client    *IDLE
+	client    *client.Client
 	box       config.Box
 	idleEvent chan<- config.IDLEEvent
 	boxEvent  chan<- BoxEvent
@@ -45,7 +45,7 @@ type WatchMailBox struct {
 
 // NewWatchBox creates a new instance of WatchMailBox and launches it
 func NewWatchBox(
-	c *IDLE,
+	c *client.Client,
 	f config.NotifyConfig,
 	m config.Box,
 	i chan<- config.IDLEEvent,
@@ -65,9 +65,6 @@ func NewWatchBox(
 
 // Watch starts watching the mailbox for IDLE events
 func (w *WatchMailBox) Watch() {
-	updates := make(chan client.Update)
-	done := make(chan error, 1)
-
 	l := slog.With(
 		slog.String("alias", w.box.Alias),
 		slog.String("mailbox", w.box.Mailbox),
@@ -85,11 +82,13 @@ func (w *WatchMailBox) Watch() {
 	w.box.ExistingEmail = status.Messages
 	l.Debug("existing mail", slog.Uint64("count", uint64(w.box.ExistingEmail)))
 
+	updates := make(chan client.Update)
 	w.client.Updates = updates
 
+	done := make(chan error, 1)
 	go func() {
 		l.Info("Watching mailbox")
-		done <- w.client.IdleWithFallback(w.quit, 0) // 0 = good default
+		done <- w.client.Idle(w.quit, nil)
 	}()
 
 	// issue fake event to trigger a first time sync
@@ -108,14 +107,14 @@ func (w *WatchMailBox) Watch() {
 
 	// Block and process IDLE events
 	run := true
+idleLoop:
 	for run {
 		select {
 		case update := <-updates:
-			mu, ok := update.(*client.MailboxUpdate)
-			if ok {
+			if mu, ok := update.(*client.MailboxUpdate); ok {
 				// if the server messages are greater than current no of messages in RAM
-				// only then take it as a new email otherwise ignore and update the current copy
-				// from the server.
+				// only then take it as a new email otherwise ignore and update the
+				// current copy from the server.
 				if mu.Mailbox.Messages > w.box.ExistingEmail {
 					// messages arrived
 					w.idleEvent <- config.IDLEEvent{
@@ -128,8 +127,8 @@ func (w *WatchMailBox) Watch() {
 				}
 				w.box.ExistingEmail = mu.Mailbox.Messages
 			}
-			_, ok = update.(*client.MessageUpdate)
-			if ok {
+
+			if _, ok := update.(*client.MessageUpdate); ok {
 				// messages flags updated
 				w.idleEvent <- config.IDLEEvent{
 					Alias:   w.box.Alias,
@@ -138,8 +137,8 @@ func (w *WatchMailBox) Watch() {
 					Box:     w.box,
 				}
 			}
-			_, ok = update.(*client.ExpungeUpdate)
-			if ok {
+
+			if _, ok := update.(*client.ExpungeUpdate); ok {
 				// messages deleted
 				w.idleEvent <- config.IDLEEvent{
 					Alias:   w.box.Alias,
@@ -148,10 +147,12 @@ func (w *WatchMailBox) Watch() {
 					Box:     w.box,
 				}
 			}
+
 		case <-w.quit:
 			// the main event loop is asking us to stop
 			l.Warn("stopping client watching mailbox")
-			run = false
+			break idleLoop
+
 		case finished := <-done:
 			l.Warn("done watching mailbox")
 			if finished != nil {
@@ -159,11 +160,12 @@ func (w *WatchMailBox) Watch() {
 					slog.Any("error", finished))
 				w.boxEvent <- BoxEvent{UniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
 			}
-			run = false
+			break idleLoop
+
 		case <-kickedOut:
 			l.Info("connection to the server closed")
-			run = false
 			w.boxEvent <- BoxEvent{UniqID: w.box.Alias + w.box.Mailbox, Mailbox: w.box}
+			break idleLoop
 		}
 	}
 }
