@@ -74,6 +74,13 @@ func NewWatchBox(
 }
 
 func (self *WatchMailBox) expunge(seqNum uint32) {
+	self.box.ExistingEmail = max(0, self.box.ExistingEmail-1)
+	slog.Info("IDLE expunge",
+		slog.String("account", self.box.Alias),
+		slog.String("mailbox", self.box.Mailbox),
+		slog.Uint64("seq", uint64(seqNum)),
+		slog.Uint64("messages", uint64(self.box.ExistingEmail)))
+
 	// messages deleted
 	self.idleEvent <- &config.IDLEEvent{
 		Alias:   self.box.Alias,
@@ -84,12 +91,18 @@ func (self *WatchMailBox) expunge(seqNum uint32) {
 }
 
 func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
+	l := slog.With(
+		slog.String("account", self.box.Alias),
+		slog.String("mailbox", self.box.Mailbox))
+
 	switch {
 	case data.NumMessages != nil:
 		// if the server messages are greater than current no of messages in RAM
 		// only then take it as a new email otherwise ignore and update the
 		// current copy from the server.
 		numMessages := *data.NumMessages
+		l = l.With(slog.Uint64("messages", uint64(numMessages)))
+
 		if numMessages > self.box.ExistingEmail {
 			// messages arrived
 			self.box.ExistingEmail = numMessages
@@ -103,6 +116,13 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		}
 
 	case data.Flags != nil || data.PermanentFlags != nil:
+		if len(data.Flags) != 0 {
+			l = l.With(slog.Any("flags", data.Flags))
+		}
+		if len(data.PermanentFlags) != 0 {
+			l = l.With(slog.Any("permanentFlags", data.PermanentFlags))
+		}
+
 		// messages flags updated
 		self.idleEvent <- &config.IDLEEvent{
 			Alias:   self.box.Alias,
@@ -111,6 +131,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 			Box:     self.box,
 		}
 	}
+	l.Info("IDLE mailbox")
 }
 
 // Watch starts watching the mailbox for IDLE events
@@ -134,7 +155,8 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 	}
 
 	self.box.ExistingEmail = status.NumMessages
-	l.Debug("existing mail", slog.Uint64("count", uint64(self.box.ExistingEmail)))
+	l.Info("SELECT mailbox",
+		slog.Uint64("messages", uint64(self.box.ExistingEmail)))
 
 	// Start idling
 	idleCmd, err := c.Idle()
