@@ -18,22 +18,4 @@ package command
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import (
-	"log/slog"
-	"os"
-	"os/exec"
-	"slices"
-)
-
 var Shell = []string{"cmd", "/c"}
-
-// PrepareCommand parses a string and returns a command executable by Go
-func New(command, mailbox string) *exec.Cmd {
-	args := slices.Concat(Shell, []string{command})
-	slog.Debug("command.New",
-		slog.String("shell", args[0]), slog.Any("args", args[1:]))
-
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = os.Stdout
-	return cmd
-}

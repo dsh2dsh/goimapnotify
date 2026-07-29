@@ -1,5 +1,3 @@
-//go:build !windows
-
 package command
 
 // This file is part of goimapnotify

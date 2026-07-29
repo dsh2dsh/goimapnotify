@@ -1,5 +1,3 @@
-//go:build !windows
-
 package command
 
 // This file is part of goimapnotify
@@ -24,16 +22,10 @@ import (
 	"slices"
 )
 
-var Shell = []string{"sh", "-c"}
-
 // New parses a string and returns a command executable by Go
 func New(command string) *exec.Cmd {
 	args := slices.Concat(Shell, []string{command})
-	slog.Debug("command.New",
+	slog.Debug("prepare command for exec",
 		slog.String("shell", args[0]), slog.Any("args", args[1:]))
-
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	return cmd
+	return exec.Command(args[0], args[1:]...)
 }

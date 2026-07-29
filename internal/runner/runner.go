@@ -18,10 +18,8 @@ package runner
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"log/slog"
-	"os/exec"
 	"sync"
 	"text/template"
 	"time"
@@ -165,14 +163,9 @@ func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
 	}
 
 	call := command.New(bufOn.String())
-	out, err := call.Output()
-	if err != nil {
-		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
-			slog.Error("stderror: " + string(exiterr.Stderr))
-		}
+	if err := execCommand(call, bufOn.String()); err != nil {
 		return fmt.Errorf("On%sMail command failed: %w", callKind, err)
 	}
-	slog.Info("stdout: " + string(out))
 
 	if onpost == "SKIP" || onpost == "" {
 		return nil
@@ -189,14 +182,9 @@ func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
 	}
 
 	call = command.New(bufOnPost.String())
-	out, err = call.Output()
-	if err != nil {
-		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
-			slog.Error("stderror: " + string(exiterr.Stderr))
-		}
+	if err := execCommand(call, bufOnPost.String()); err != nil {
 		return fmt.Errorf("On%sMailPost command failed: %w", callKind, err)
 	}
-	slog.Info("stdout: " + string(out))
 	return nil
 }
 
