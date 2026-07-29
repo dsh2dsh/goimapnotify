@@ -164,7 +164,7 @@ func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call := command.New(bufOn.String(), event.Mailbox)
+	call := command.New(bufOn.String())
 	out, err := call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -188,7 +188,7 @@ func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call = command.New(bufOnPost.String(), event.Mailbox)
+	call = command.New(bufOnPost.String())
 	out, err = call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {

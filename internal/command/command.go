@@ -19,24 +19,20 @@ package command
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"fmt"
 	"log/slog"
 	"os/exec"
-	"strings"
+	"slices"
 )
 
-// New parses a string and returns a command executable by Go
-func New(command, mailbox string) *exec.Cmd {
-	var commandstr string
-	if strings.Contains(command, "%s") {
-		commandstr = fmt.Sprintf(command, mailbox)
-	} else {
-		commandstr = command
-	}
+var Shell = []string{"sh", "-c"}
 
-	commandsplt := append([]string{"sh", "-c"}, commandstr)
-	slog.Debug("Command: " + strings.Join(commandsplt, " "))
-	cmd := exec.Command(commandsplt[0], commandsplt[1:]...)
+// New parses a string and returns a command executable by Go
+func New(command string) *exec.Cmd {
+	args := slices.Concat(Shell, []string{command})
+	slog.Debug("command.New",
+		slog.String("shell", args[0]), slog.Any("args", args[1:]))
+
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd

@@ -27,7 +27,6 @@ func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string
 		command  string
-		mailbox  string
 		wantArgs []string
 	}{
 		{
@@ -36,21 +35,9 @@ func TestNew(t *testing.T) {
 			wantArgs: []string{"sh", "-c", "echo hello"},
 		},
 		{
-			name:     "command with %s placeholder",
-			command:  "mbsync %s",
-			mailbox:  "INBOX",
-			wantArgs: []string{"sh", "-c", "mbsync INBOX"},
-		},
-		{
 			name:     "command with quotes",
 			command:  "emacsclient -e '(something)'",
 			wantArgs: []string{"sh", "-c", "emacsclient -e '(something)'"},
-		},
-		{
-			name:     "command with multiple %s",
-			command:  "echo %s %s",
-			mailbox:  "INBOX",
-			wantArgs: []string{"sh", "-c", "echo INBOX %!s(MISSING)"},
 		},
 		{
 			name:     "command with pipes",
@@ -67,17 +54,11 @@ func TestNew(t *testing.T) {
 			command:  "echo $HOME",
 			wantArgs: []string{"sh", "-c", "echo $HOME"},
 		},
-		{
-			name:     "command with special mailbox name",
-			command:  "mbsync '%s'",
-			mailbox:  "INBOX/Subfolder",
-			wantArgs: []string{"sh", "-c", "mbsync 'INBOX/Subfolder'"},
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := New(tt.command, tt.mailbox)
+			cmd := New(tt.command)
 
 			if !reflect.DeepEqual(cmd.Args, tt.wantArgs) {
 				t.Errorf("New() Args = %v, want %v", cmd.Args, tt.wantArgs)
@@ -87,7 +68,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestNew_ReturnsValidCmd(t *testing.T) {
-	cmd := New("echo test", "")
+	cmd := New("echo test")
 
 	if cmd == nil {
 		t.Fatal("New() returned nil")
@@ -100,7 +81,7 @@ func TestNew_ReturnsValidCmd(t *testing.T) {
 }
 
 func TestNew_StdoutStderrAreNil(t *testing.T) {
-	cmd := New("echo test", "")
+	cmd := New("echo test")
 
 	if cmd.Stdout != nil {
 		t.Error("New() Stdout should be nil")
@@ -111,7 +92,7 @@ func TestNew_StdoutStderrAreNil(t *testing.T) {
 }
 
 func TestNew_CanExecute(t *testing.T) {
-	cmd := New("echo hello", "")
+	cmd := New("echo hello")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -123,76 +104,11 @@ func TestNew_CanExecute(t *testing.T) {
 	}
 }
 
-func TestNew_WithMailboxSubstitution(t *testing.T) {
-	cmd := New("echo %s", "TestMailbox")
-
-	output, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("Command execution failed: %v", err)
-	}
-
-	if string(output) != "TestMailbox\n" {
-		t.Errorf("Command output = %q, want %q", string(output), "TestMailbox\n")
-	}
-}
-
-func TestNew_WithoutSubstitution(t *testing.T) {
-	// Command without %s should not substitute
-	cmd := New("echo static", "INBOX")
-
-	output, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("Command execution failed: %v", err)
-	}
-
-	if string(output) != "static\n" {
-		t.Errorf("Command output = %q, want %q", string(output), "static\n")
-	}
-}
-
 // TestBugArgs is the original test (kept for compatibility)
 func TestBugArgs(t *testing.T) {
 	args := []string{"sh", "-c", "emacsclient -e '(something)'"}
-	cmd := New("emacsclient -e '(something)'", "")
+	cmd := New("emacsclient -e '(something)'")
 	if !reflect.DeepEqual(cmd.Args, args) {
 		t.Errorf("*cmd.Args are %+v, expected %+v", cmd.Args, args)
-	}
-}
-
-func TestNew_EmptyMailbox(t *testing.T) {
-	cmd := New("echo '%s'", "")
-
-	// Should still work with empty mailbox
-	output, err := cmd.Output()
-	if err != nil {
-		t.Fatalf("Command execution failed: %v", err)
-	}
-
-	// echo '' produces just a newline (empty string between quotes is empty output)
-	if string(output) != "\n" {
-		t.Errorf("Command output = %q, want %q", string(output), "\n")
-	}
-}
-
-func TestNew_SpecialCharactersInMailbox(t *testing.T) {
-	testCases := []struct {
-		name    string
-		mailbox string
-	}{
-		{"with space", "INBOX Folder"},
-		{"with slash", "INBOX/Subfolder"},
-		{"with dot", "INBOX.Subfolder"},
-		{"with ampersand", "Test&Archive"},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			cmd := New("echo %s", tc.mailbox)
-
-			// Command should at least be created without error
-			if cmd == nil {
-				t.Error("New() returned nil")
-			}
-		})
 	}
 }

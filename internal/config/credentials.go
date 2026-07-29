@@ -36,7 +36,7 @@ func retrieveCmd(cmdLine, def string) string {
 		return def
 	}
 
-	cmd := command.New(cmdLine, "")
+	cmd := command.New(cmdLine)
 	// Avoid leaking the password
 	cmd.Stdout = nil
 	buf, err := cmd.Output()

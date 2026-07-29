@@ -12,6 +12,7 @@ func (self *NotifyConfig) FillBox(box *Box) error {
 	if box.OnNewMail == "" {
 		box.OnNewMail = self.OnNewMail
 	}
+	box.OnNewMail = compatMailboxPlaceholder(box.OnNewMail)
 
 	if err := compileTemplate(box.OnNewMail); err != nil {
 		return err
@@ -20,6 +21,7 @@ func (self *NotifyConfig) FillBox(box *Box) error {
 	if box.OnNewMailPost == "" {
 		box.OnNewMailPost = self.OnNewMailPost
 	}
+	box.OnNewMailPost = compatMailboxPlaceholder(box.OnNewMailPost)
 
 	if err := compileTemplate(box.OnNewMailPost); err != nil {
 		return err
@@ -29,6 +31,7 @@ func (self *NotifyConfig) FillBox(box *Box) error {
 	if box.OnDeletedMail == "" {
 		box.OnDeletedMail = self.OnDeletedMail
 	}
+	box.OnDeletedMail = compatMailboxPlaceholder(box.OnDeletedMail)
 
 	if err := compileTemplate(box.OnDeletedMail); err != nil {
 		return err
@@ -37,6 +40,7 @@ func (self *NotifyConfig) FillBox(box *Box) error {
 	if box.OnDeletedMailPost == "" {
 		box.OnDeletedMailPost = self.OnDeletedMailPost
 	}
+	box.OnDeletedMailPost = compatMailboxPlaceholder(box.OnDeletedMailPost)
 
 	if err := compileTemplate(box.OnDeletedMailPost); err != nil {
 		return err
@@ -44,6 +48,13 @@ func (self *NotifyConfig) FillBox(box *Box) error {
 
 	box.Alias = self.Alias
 	return nil
+}
+
+func compatMailboxPlaceholder(command string) string {
+	if command == "" {
+		return command
+	}
+	return strings.ReplaceAll(command, "%s", "{{ .Mailbox }}")
 }
 
 // compileTemplate tests that the string template is valid, if any was provided.
