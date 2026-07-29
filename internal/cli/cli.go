@@ -190,7 +190,7 @@ accountLoop:
 					slog.String("account", account.Alias), slog.Any("error", err))
 				mailbox.Alias = account.Alias
 				wg.Go(func() {
-					reconnectWatcher(&imap.BoxEvent{UniqID: key, Mailbox: mailbox},
+					reconnectWatcher(&imap.BoxEvent{Mailbox: mailbox},
 						account, idleChan, boxChan, quitChan, flagRetries)
 				})
 				watching++
@@ -353,11 +353,7 @@ func reconnectWatcher(
 		client, err := imap.New(cfg, retries, imap.WithWatcher(wb))
 		if errors.Is(err, imap.ErrLoginFailed) {
 			l.Error("Reconnection failed", slog.Any("error", err))
-			boxChan <- &imap.BoxEvent{
-				UniqID:  event.UniqID,
-				Mailbox: event.Mailbox,
-				Skipped: true,
-			}
+			boxChan <- &imap.BoxEvent{Mailbox: event.Mailbox, Skipped: true}
 			return
 		} else if err != nil {
 			backoff = min(backoff*2, maxBackoff)

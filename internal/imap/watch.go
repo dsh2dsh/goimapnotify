@@ -44,7 +44,6 @@ func WithWatcher(w *WatchMailBox) option {
 // BoxEvent helps in communication between the box watch launcher and the box
 // watching goroutines
 type BoxEvent struct {
-	UniqID  string
 	Mailbox *config.Box
 	Skipped bool
 }
@@ -146,11 +145,7 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 	}).Wait()
 	if err != nil {
 		l.Warn("cannot select mailbox, skipped!", slog.Any("error", err))
-		self.boxEvent <- &BoxEvent{
-			UniqID:  self.box.Alias + self.box.Mailbox,
-			Mailbox: self.box,
-			Skipped: true,
-		}
+		self.boxEvent <- &BoxEvent{Mailbox: self.box, Skipped: true}
 		return
 	}
 
@@ -203,10 +198,7 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 		if err != nil {
 			l.Info("watching stopped because of an error",
 				slog.Any("error", err))
-			self.boxEvent <- &BoxEvent{
-				UniqID:  self.box.Alias + self.box.Mailbox,
-				Mailbox: self.box,
-			}
+			self.boxEvent <- &BoxEvent{Mailbox: self.box}
 		}
 	}
 }
