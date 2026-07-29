@@ -34,7 +34,6 @@ import (
 	"github.com/emersion/go-sasl"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
-	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 type option func(*imapclient.Options)
@@ -61,7 +60,7 @@ func New(conf *config.NotifyConfig, retries int, opts ...option,
 			_ = pr.Close() // close the pipe when the program is about to close
 		}()
 
-		go util.CensorCredentials(pr, os.Stdout)
+		go censorCredentials(pr, os.Stdout)
 		imapOpts.DebugWriter = pw
 	}
 

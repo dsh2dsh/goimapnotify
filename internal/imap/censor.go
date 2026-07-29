@@ -1,4 +1,4 @@
-package util
+package imap
 
 import (
 	"bufio"
@@ -12,12 +12,12 @@ var (
 	detectPasswordInLOGIN = regexp.MustCompile(`^(.*LOGIN\s+\S+\s+)"[^"]+"(.*)$`)
 )
 
-// CensorCredentials pipes input to output while censoring sensitive information
-func CensorCredentials(in io.Reader, out io.Writer) {
+// censorCredentials pipes input to output while censoring sensitive information
+func censorCredentials(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
 		line := scanner.Text()
-		censoredLine := CensorEmailAddress(CensorPasswordInLogin(line))
+		censoredLine := censorEmailAddress(censorPasswordInLogin(line))
 
 		_, err := out.Write([]byte(censoredLine + "\n"))
 		if err != nil {
@@ -30,24 +30,20 @@ func CensorCredentials(in io.Reader, out io.Writer) {
 	}
 }
 
-// CensorPasswordInLogin replaces password in LOGIN command
-func CensorPasswordInLogin(in string) string {
+// censorPasswordInLogin replaces password in LOGIN command
+func censorPasswordInLogin(in string) string {
 	matches := detectPasswordInLOGIN.FindStringSubmatch(in)
-
 	if len(matches) == 0 {
 		return in
 	}
-
 	return matches[1] + `"****"` + matches[2]
 }
 
-// CensorEmailAddress replaces email addresses with asterisks
-func CensorEmailAddress(in string) string {
+// censorEmailAddress replaces email addresses with asterisks
+func censorEmailAddress(in string) string {
 	matches := emailRegexp.FindAllString(in, -1)
-
 	if len(matches) == 0 {
 		return in
 	}
-
 	return emailRegexp.ReplaceAllString(in, "*******@*****.***")
 }

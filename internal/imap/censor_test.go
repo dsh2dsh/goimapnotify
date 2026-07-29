@@ -1,4 +1,4 @@
-package util
+package imap
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025  Jorge Javier Araya Navarro
@@ -82,7 +82,7 @@ func TestCensorEmailAddress(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CensorEmailAddress(tt.input)
+			result := censorEmailAddress(tt.input)
 			if result != tt.expected {
 				t.Errorf("CensorEmailAddress(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
@@ -135,7 +135,7 @@ func TestCensorPasswordInLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CensorPasswordInLogin(tt.input)
+			result := censorPasswordInLogin(tt.input)
 			if result != tt.expected {
 				t.Errorf("CensorPasswordInLogin(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
@@ -186,7 +186,7 @@ func TestCensorCredentials(t *testing.T) {
 			in := strings.NewReader(tt.input)
 			out := &bytes.Buffer{}
 
-			CensorCredentials(in, out)
+			censorCredentials(in, out)
 
 			result := out.String()
 			if result != tt.expected {
@@ -213,7 +213,7 @@ S: * 5 EXISTS
 	in := strings.NewReader(input)
 	out := &bytes.Buffer{}
 
-	CensorCredentials(in, out)
+	censorCredentials(in, out)
 
 	result := out.String()
 	if result != expected {
