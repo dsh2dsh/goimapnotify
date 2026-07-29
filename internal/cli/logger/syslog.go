@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"unicode"
 )
 
 func HasSyslog() bool { return true }
@@ -85,7 +86,7 @@ func (self *SyslogHandler) Handle(ctx context.Context, r slog.Record) error {
 
 	// Discard trailing '\n', added by slog.TextHandler, and trailing ' ' added by
 	// formatStd.
-	b := bytes.TrimSpace(self.b.Bytes())
+	b := bytes.TrimRightFunc(self.b.Bytes(), unicode.IsSpace)
 	self.b.Truncate(len(b))
 
 	self.b.WriteByte('\n')
