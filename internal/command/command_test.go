@@ -1,6 +1,6 @@
 //go:build !windows
 
-package util
+package command
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025  Jorge Javier Araya Navarro
@@ -23,7 +23,7 @@ import (
 	"testing"
 )
 
-func TestPrepareCommand(t *testing.T) {
+func TestNew(t *testing.T) {
 	tests := []struct {
 		name     string
 		command  string
@@ -77,45 +77,45 @@ func TestPrepareCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := PrepareCommand(tt.command, tt.mailbox)
+			cmd := New(tt.command, tt.mailbox)
 
 			if !reflect.DeepEqual(cmd.Args, tt.wantArgs) {
-				t.Errorf("PrepareCommand() Args = %v, want %v", cmd.Args, tt.wantArgs)
+				t.Errorf("New() Args = %v, want %v", cmd.Args, tt.wantArgs)
 			}
 		})
 	}
 }
 
-func TestPrepareCommand_ReturnsValidCmd(t *testing.T) {
-	cmd := PrepareCommand("echo test", "")
+func TestNew_ReturnsValidCmd(t *testing.T) {
+	cmd := New("echo test", "")
 
 	if cmd == nil {
-		t.Fatal("PrepareCommand() returned nil")
+		t.Fatal("New() returned nil")
 	}
 
 	// Cmd should be executable
 	if cmd.Path == "" {
-		t.Error("PrepareCommand() returned cmd with empty Path")
+		t.Error("New() returned cmd with empty Path")
 	}
 }
 
-func TestPrepareCommand_StdoutStderrAreNil(t *testing.T) {
-	cmd := PrepareCommand("echo test", "")
+func TestNew_StdoutStderrAreNil(t *testing.T) {
+	cmd := New("echo test", "")
 
 	if cmd.Stdout != nil {
-		t.Error("PrepareCommand() Stdout should be nil")
+		t.Error("New() Stdout should be nil")
 	}
 	if cmd.Stderr != nil {
-		t.Error("PrepareCommand() Stderr should be nil")
+		t.Error("New() Stderr should be nil")
 	}
 }
 
-func TestPrepareCommand_CanExecute(t *testing.T) {
-	cmd := PrepareCommand("echo hello", "")
+func TestNew_CanExecute(t *testing.T) {
+	cmd := New("echo hello", "")
 
 	output, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("PrepareCommand() returned cmd that failed to execute: %v", err)
+		t.Fatalf("New() returned cmd that failed to execute: %v", err)
 	}
 
 	if string(output) != "hello\n" {
@@ -123,8 +123,8 @@ func TestPrepareCommand_CanExecute(t *testing.T) {
 	}
 }
 
-func TestPrepareCommand_WithMailboxSubstitution(t *testing.T) {
-	cmd := PrepareCommand("echo %s", "TestMailbox")
+func TestNew_WithMailboxSubstitution(t *testing.T) {
+	cmd := New("echo %s", "TestMailbox")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -136,9 +136,9 @@ func TestPrepareCommand_WithMailboxSubstitution(t *testing.T) {
 	}
 }
 
-func TestPrepareCommand_WithoutSubstitution(t *testing.T) {
+func TestNew_WithoutSubstitution(t *testing.T) {
 	// Command without %s should not substitute
-	cmd := PrepareCommand("echo static", "INBOX")
+	cmd := New("echo static", "INBOX")
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -153,14 +153,14 @@ func TestPrepareCommand_WithoutSubstitution(t *testing.T) {
 // TestBugArgs is the original test (kept for compatibility)
 func TestBugArgs(t *testing.T) {
 	args := []string{"sh", "-c", "emacsclient -e '(something)'"}
-	cmd := PrepareCommand("emacsclient -e '(something)'", "")
+	cmd := New("emacsclient -e '(something)'", "")
 	if !reflect.DeepEqual(cmd.Args, args) {
 		t.Errorf("*cmd.Args are %+v, expected %+v", cmd.Args, args)
 	}
 }
 
-func TestPrepareCommand_EmptyMailbox(t *testing.T) {
-	cmd := PrepareCommand("echo '%s'", "")
+func TestNew_EmptyMailbox(t *testing.T) {
+	cmd := New("echo '%s'", "")
 
 	// Should still work with empty mailbox
 	output, err := cmd.Output()
@@ -174,7 +174,7 @@ func TestPrepareCommand_EmptyMailbox(t *testing.T) {
 	}
 }
 
-func TestPrepareCommand_SpecialCharactersInMailbox(t *testing.T) {
+func TestNew_SpecialCharactersInMailbox(t *testing.T) {
 	testCases := []struct {
 		name    string
 		mailbox string
@@ -187,11 +187,11 @@ func TestPrepareCommand_SpecialCharactersInMailbox(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := PrepareCommand("echo %s", tc.mailbox)
+			cmd := New("echo %s", tc.mailbox)
 
 			// Command should at least be created without error
 			if cmd == nil {
-				t.Error("PrepareCommand() returned nil")
+				t.Error("New() returned nil")
 			}
 		})
 	}

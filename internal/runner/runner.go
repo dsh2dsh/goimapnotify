@@ -26,8 +26,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/dsh2dsh/goimapnotify/internal/command"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
-	"github.com/dsh2dsh/goimapnotify/internal/util"
 )
 
 // RunningBox manages command scheduling and execution
@@ -164,7 +164,7 @@ func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call := util.PrepareCommand(bufOn.String(), event.Mailbox)
+	call := command.New(bufOn.String(), event.Mailbox)
 	out, err := call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -188,7 +188,7 @@ func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
 		return fmt.Errorf("there was an error while executing the template, error: %w", err)
 	}
 
-	call = util.PrepareCommand(bufOnPost.String(), event.Mailbox)
+	call = command.New(bufOnPost.String(), event.Mailbox)
 	out, err = call.Output()
 	if err != nil {
 		if exiterr, ok := errors.AsType[*exec.ExitError](err); ok {

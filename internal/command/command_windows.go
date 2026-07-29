@@ -1,6 +1,6 @@
-//go:build !windows
+//go:build windows
 
-package util
+package command
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2025  Jorge Javier Araya Navarro
@@ -21,12 +21,13 @@ package util
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 )
 
 // PrepareCommand parses a string and returns a command executable by Go
-func PrepareCommand(command, mailbox string) *exec.Cmd {
+func New(command, mailbox string) *exec.Cmd {
 	var commandstr string
 	if strings.Contains(command, "%s") {
 		commandstr = fmt.Sprintf(command, mailbox)
@@ -34,11 +35,9 @@ func PrepareCommand(command, mailbox string) *exec.Cmd {
 		commandstr = command
 	}
 
-	commandsplt := append([]string{"sh", "-c"}, commandstr)
+	commandsplt := append([]string{"cmd", "/c"}, commandstr)
 	slog.Debug("Command: " + strings.Join(commandsplt, " "))
-	// #nosec
 	cmd := exec.Command(commandsplt[0], commandsplt[1:]...)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
+	cmd.Stdout = os.Stdout
 	return cmd
 }

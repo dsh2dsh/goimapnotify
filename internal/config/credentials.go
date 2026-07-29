@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dsh2dsh/goimapnotify/internal/util"
+	"github.com/dsh2dsh/goimapnotify/internal/command"
 )
 
 // RetrieveCmd executes all credential commands and updates the config
@@ -36,7 +36,7 @@ func retrieveCmd(cmdLine, def string) string {
 		return def
 	}
 
-	cmd := util.PrepareCommand(cmdLine, "")
+	cmd := command.New(cmdLine, "")
 	// Avoid leaking the password
 	cmd.Stdout = nil
 	buf, err := cmd.Output()
