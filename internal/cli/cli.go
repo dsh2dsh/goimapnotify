@@ -29,6 +29,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/cli/logger"
@@ -173,6 +174,7 @@ func Run() error {
 
 accountLoop:
 	for _, account := range topConfig.Configurations {
+		var connected bool
 		for _, mailbox := range account.Boxes {
 			key := account.Alias + mailbox.Mailbox
 			running.Config[key] = account
@@ -193,6 +195,12 @@ accountLoop:
 				})
 				watching++
 				continue
+			}
+
+			if !connected {
+				printConnected(slog.With(slog.String("account", account.Alias)),
+					client)
+				connected = true
 			}
 
 			wg.Go(func() {
@@ -364,4 +372,11 @@ func reconnectWatcher(
 		_ = client.Close()
 		return
 	}
+}
+
+func printConnected(l *slog.Logger, c *imapclient.Client) {
+	if caps := imap.AllCaps(c); len(caps) != 0 {
+		l = l.With(slog.Any("capabilities", caps))
+	}
+	l.Info("connected")
 }
