@@ -142,6 +142,66 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func loadConfiguration(filename string, retries int,
+) (*config.Configuration, error) {
+	cfg, err := config.LoadYAML(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, conf := range cfg.Configurations {
+		conf.RetrieveCmd()
+		if conf.Alias == "" {
+			conf.Alias = conf.Username
+		}
+		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+			conf.Alias = "<?>"
+		}
+
+		if len(conf.Boxes) != 0 {
+			// replace all listed mailboxes with the same mailboxes carrying values
+			// from the configuration
+			for _, mailbox := range conf.Boxes {
+				if err := conf.FillBox(mailbox); err != nil {
+					return nil, fmt.Errorf("template is invalid: %w", err)
+				}
+			}
+			continue
+		}
+
+		// If there is no mailboxes, watch over all mailboxes of the account
+		c, err := imap.New(conf, retries)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"account %q, failed to create IMAP client, error: %w",
+				conf.Username, err,
+			)
+		}
+		defer c.Close()
+
+	mailboxLoop:
+		for mailbox, err := range imap.Mailboxes(c) {
+			if err != nil {
+				return nil, fmt.Errorf(
+					"failed to list all mailboxes, account=%s: %w", conf.Username, err)
+			}
+			// Ignore mailboxes with attributes `\All` and `\Noselect`
+			for _, attr := range mailbox.Attrs {
+				if attr == "\\All" || attr == "\\Noselect" {
+					continue mailboxLoop
+				}
+			}
+
+			box := &config.Box{Mailbox: mailbox.Mailbox}
+			if err := conf.FillBox(box); err != nil {
+				return nil, fmt.Errorf("template is invalid: %w", err)
+			}
+			conf.Boxes = append(conf.Boxes, box)
+		}
+	}
+	return cfg, nil
+}
+
 func Run() error {
 	if flagList {
 		return listMailboxes(topConfig)
@@ -266,66 +326,6 @@ idleLoop:
 		return errors.New("nothing left to watch")
 	}
 	return nil
-}
-
-func loadConfiguration(filename string, retries int,
-) (*config.Configuration, error) {
-	cfg, err := config.LoadYAML(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, conf := range cfg.Configurations {
-		conf.RetrieveCmd()
-		if conf.Alias == "" {
-			conf.Alias = conf.Username
-		}
-		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-			conf.Alias = "<?>"
-		}
-
-		if len(conf.Boxes) != 0 {
-			// replace all listed mailboxes with the same mailboxes carrying values
-			// from the configuration
-			for _, mailbox := range conf.Boxes {
-				if err := conf.FillBox(mailbox); err != nil {
-					return nil, fmt.Errorf("template is invalid: %w", err)
-				}
-			}
-			continue
-		}
-
-		// If there is no mailboxes, watch over all mailboxes of the account
-		c, err := imap.New(conf, retries)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"account %q, failed to create IMAP client, error: %w",
-				conf.Username, err,
-			)
-		}
-		defer c.Close()
-
-	mailboxLoop:
-		for mailbox, err := range imap.Mailboxes(c) {
-			if err != nil {
-				return nil, fmt.Errorf(
-					"failed to list all mailboxes, account=%s: %w", conf.Username, err)
-			}
-			// Ignore mailboxes with attributes `\All` and `\Noselect`
-			for _, attr := range mailbox.Attrs {
-				if attr == "\\All" || attr == "\\Noselect" {
-					continue mailboxLoop
-				}
-			}
-
-			box := &config.Box{Mailbox: mailbox.Mailbox}
-			if err := conf.FillBox(box); err != nil {
-				return nil, fmt.Errorf("template is invalid: %w", err)
-			}
-			conf.Boxes = append(conf.Boxes, box)
-		}
-	}
-	return cfg, nil
 }
 
 func reconnectWatcher(
