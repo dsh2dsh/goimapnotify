@@ -143,6 +143,10 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 }
 
 func Run() error {
+	if flagList {
+		return listMailboxes(topConfig)
+	}
+
 	slog.Info("Running",
 		slog.String("commit", commit),
 		slog.String("tag", gittag),
@@ -156,10 +160,6 @@ func Run() error {
 
 	running := runner.NewRunningBox(debug, flagWait)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	if flagList {
-		return listMailboxes(topConfig)
-	}
 
 	// Watch mailboxes events
 	// This kick-starts the watching
