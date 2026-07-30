@@ -63,9 +63,6 @@ func TestNewRunningBox(t *testing.T) {
 			if rb.Wait != tt.wait {
 				t.Errorf("Wait = %v, want %v", rb.Wait, tt.wait)
 			}
-			if rb.Config == nil {
-				t.Error("Config map is nil")
-			}
 		})
 	}
 }
@@ -738,28 +735,6 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 				t.Errorf("Run() error = %v", err)
 			}
 		})
-	}
-}
-
-// TestRunningBox_Config tests that Config map can be used
-func TestRunningBox_Config(t *testing.T) {
-	rb := NewRunningBox(false, 1)
-
-	// Config should be initialized and usable
-	conf := config.NotifyConfig{
-		Host:     "imap.example.com",
-		Port:     993,
-		Username: "test@example.com",
-	}
-
-	rb.Config["test@example.com"] = &conf
-
-	retrieved, ok := rb.Config["test@example.com"]
-	if !ok {
-		t.Fatal("Config not stored correctly")
-	}
-	if retrieved.Host != "imap.example.com" {
-		t.Errorf("Config Host = %q, want %q", retrieved.Host, "imap.example.com")
 	}
 }
 

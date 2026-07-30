@@ -36,17 +36,15 @@ type RunningBox struct {
 	 * Use map to create a different timer for each
 	 * username-mailbox combination
 	 */
-	timer  sync.Map
-	Config map[string]*config.NotifyConfig
+	timer sync.Map
 }
 
 // NewRunningBox creates a new RunningBox instance
 func NewRunningBox(debug bool, wait int) *RunningBox {
 	return &RunningBox{
-		Debug:  debug,
-		Wait:   wait,
-		timer:  sync.Map{},
-		Config: make(map[string]*config.NotifyConfig),
+		Debug: debug,
+		Wait:  wait,
+		timer: sync.Map{},
 	}
 }
 

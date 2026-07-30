@@ -231,13 +231,15 @@ func Run() error {
 
 	var wg sync.WaitGroup
 	var watching int
+	accounts := make(map[string]*config.NotifyConfig,
+		len(topConfig.Configurations))
 
 accountLoop:
 	for _, account := range topConfig.Configurations {
 		var connected bool
 		for _, mailbox := range account.Boxes {
 			key := account.Alias + mailbox.Mailbox
-			running.Config[key] = account
+			accounts[key] = account
 
 			wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan)
 			client, err := imap.New(account, flagRetries, imap.WithWatcher(wb))
@@ -295,8 +297,8 @@ idleLoop:
 
 			key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
 			wg.Go(func() {
-				reconnectWatcher(boxEvent, running.Config[key], idleChan, boxChan,
-					quitChan, flagRetries)
+				reconnectWatcher(boxEvent, accounts[key], idleChan, boxChan, quitChan,
+					flagRetries)
 			})
 
 		case <-quit:
