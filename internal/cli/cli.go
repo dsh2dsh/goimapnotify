@@ -133,7 +133,7 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cfg, err := loadConfiguration(flagConfig, flagRetries)
+	cfg, err := loadConfiguration(flagConfig)
 	if err != nil {
 		return fmt.Errorf("can't load the configuration %q: %w", flagConfig, err)
 	}
@@ -143,8 +143,7 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func loadConfiguration(filename string, retries int,
-) (*config.Configuration, error) {
+func loadConfiguration(filename string) (*config.Configuration, error) {
 	cfg, err := config.LoadYAML(filename)
 	if err != nil {
 		return nil, err
@@ -158,35 +157,6 @@ func loadConfiguration(filename string, retries int,
 		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 			conf.Alias = "<?>"
 		}
-
-		if len(conf.Boxes) != 0 {
-			continue
-		}
-
-		// If there is no mailboxes, watch over all mailboxes of the account
-		c, err := imap.New(conf, retries)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"account %q, failed to create IMAP client, error: %w",
-				conf.Username, err,
-			)
-		}
-		defer c.Close()
-
-	mailboxLoop:
-		for mailbox, err := range imap.Mailboxes(c) {
-			if err != nil {
-				return nil, fmt.Errorf(
-					"failed to list all mailboxes, account=%s: %w", conf.Username, err)
-			}
-			// Ignore mailboxes with attributes `\All` and `\Noselect`
-			for _, attr := range mailbox.Attrs {
-				if attr == "\\All" || attr == "\\Noselect" {
-					continue mailboxLoop
-				}
-			}
-			conf.Boxes = append(conf.Boxes, &config.Box{Mailbox: mailbox.Mailbox})
-		}
 	}
 	return cfg, nil
 }
@@ -196,7 +166,7 @@ func Run() error {
 		return listMailboxes(topConfig)
 	}
 
-	boxes, err := boxesFromConfig(topConfig.Configurations)
+	boxes, err := boxesFromConfig(topConfig.Configurations, flagRetries)
 	if err != nil {
 		return fmt.Errorf("parse configurations: %w", err)
 	}
@@ -329,16 +299,56 @@ type accountBoxes struct {
 	Boxes []*box.Box
 }
 
-func boxesFromConfig(c []*config.NotifyConfig) ([]accountBoxes, error) {
+func boxesFromConfig(c []*config.NotifyConfig, retries int,
+) ([]accountBoxes, error) {
 	ab := make([]accountBoxes, len(c))
-	for i, a := range c {
-		boxes, err := box.NewFromConfig(a)
+	for i, accountConfig := range c {
+		configuredBoxes := accountConfig.Boxes
+		if len(configuredBoxes) == 0 {
+			// If there is no mailboxes, watch over all mailboxes of the account
+			boxes, err := boxesFromIMAP(accountConfig, retries)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"generate boxes configuration from IMAP: %w", err)
+			}
+			configuredBoxes = boxes
+		}
+
+		boxes, err := box.CompileBoxes(accountConfig, configuredBoxes)
 		if err != nil {
 			return nil, err
 		}
-		ab[i] = accountBoxes{NotifyConfig: a, Boxes: boxes}
+		ab[i] = accountBoxes{NotifyConfig: accountConfig, Boxes: boxes}
 	}
 	return ab, nil
+}
+
+func boxesFromIMAP(account *config.NotifyConfig, retries int,
+) (boxes []*config.Box, _ error) {
+	c, err := imap.New(account, retries)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"account %q, failed to create IMAP client, error: %w",
+			account.Username, err,
+		)
+	}
+	defer c.Close()
+
+mailboxLoop:
+	for mailbox, err := range imap.Mailboxes(c) {
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to list all mailboxes, account=%s: %w", account.Username, err)
+		}
+		// Ignore mailboxes with attributes `\All` and `\Noselect`
+		for _, attr := range mailbox.Attrs {
+			if attr == "\\All" || attr == "\\Noselect" {
+				continue mailboxLoop
+			}
+		}
+		boxes = append(boxes, &config.Box{Mailbox: mailbox.Mailbox})
+	}
+	return boxes, nil
 }
 
 func reconnectWatcher(

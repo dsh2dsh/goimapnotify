@@ -26,26 +26,33 @@ type Box struct {
 }
 
 func NewFromConfig(cfg *config.NotifyConfig) ([]*Box, error) {
-	account := config.Box{
-		OnNewMail:         cfg.OnNewMail,
-		OnNewMailPost:     cfg.OnNewMailPost,
-		OnChangedMail:     cfg.OnChangedMail,
-		OnChangedMailPost: cfg.OnChangedMailPost,
-		OnDeletedMail:     cfg.OnDeletedMail,
-		OnDeletedMailPost: cfg.OnDeletedMailPost,
+	return CompileBoxes(cfg, cfg.Boxes)
+}
+
+func CompileBoxes(accountConfig *config.NotifyConfig,
+	configuredBoxes []*config.Box,
+) ([]*Box, error) {
+	accountBox := config.Box{
+		OnNewMail:         accountConfig.OnNewMail,
+		OnNewMailPost:     accountConfig.OnNewMailPost,
+		OnChangedMail:     accountConfig.OnChangedMail,
+		OnChangedMailPost: accountConfig.OnChangedMailPost,
+		OnDeletedMail:     accountConfig.OnDeletedMail,
+		OnDeletedMailPost: accountConfig.OnDeletedMailPost,
 	}
-	def := Box{Box: &account}
+	def := Box{Box: &accountBox}
 
 	if err := def.compileTemplates(&def); err != nil {
-		return nil, fmt.Errorf("parse commands: account=%s: %w", cfg.Alias, err)
+		return nil, fmt.Errorf("parse commands: account=%s: %w",
+			accountConfig.Alias, err)
 	}
 
-	boxes := make([]*Box, 0, len(cfg.Boxes))
-	for _, in := range cfg.Boxes {
-		box := (&Box{Box: in}).WithAccount(cfg)
+	boxes := make([]*Box, 0, len(configuredBoxes))
+	for _, in := range configuredBoxes {
+		box := (&Box{Box: in}).WithAccount(accountConfig)
 		if err := box.compileTemplates(&def); err != nil {
 			return nil, fmt.Errorf("parse commands: account=%s, mailbox=%s: %w",
-				cfg.Alias, in.Mailbox, err)
+				accountConfig.Alias, in.Mailbox, err)
 		}
 		boxes = append(boxes, box)
 	}
