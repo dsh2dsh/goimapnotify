@@ -14,7 +14,9 @@ func LoadYAML(filename string) (*Configuration, error) {
 		return nil, fmt.Errorf("config: read %q: %w", filename, err)
 	}
 
-	cfg := &Configuration{}
+	cfg := &Configuration{
+		StartupSync: true,
+	}
 	if err := yaml.Unmarshal(b, cfg); err != nil {
 		return nil, fmt.Errorf("config: parse yaml %q: %w", filename, err)
 	}

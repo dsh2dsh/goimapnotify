@@ -25,6 +25,17 @@ testing.
   Support of `JSON` or `TOML` removed. Default configuration file is
   `$XDG_CONFIG_HOME/goimapnotify/goimapnotify.yaml`.
 
+* Option to disable startup sync of every mailbox
+
+  By default it runs `onNewMail` command for every mailbox. With top level
+  option
+
+  ```yaml
+  startupSync: false # don't run onNewMail right after connection
+  ```
+
+  it skipped.
+
 ## Configuration
 
 This application is mostly compatible with the configuration of

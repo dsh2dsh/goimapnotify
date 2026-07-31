@@ -55,6 +55,8 @@ type WatchMailBox struct {
 	idleEvent chan<- *box.IDLE
 	boxEvent  chan<- *BoxEvent
 	quit      <-chan struct{}
+
+	startupSync bool
 }
 
 // NewWatchBox creates a new instance of WatchMailBox and launches it
@@ -70,6 +72,11 @@ func NewWatchBox(
 		boxEvent:  b,
 		quit:      q,
 	}
+}
+
+func (self *WatchMailBox) WithStartupSync(v bool) *WatchMailBox {
+	self.startupSync = v
+	return self
 }
 
 func (self *WatchMailBox) expunge(seqNum uint32) {
@@ -161,14 +168,16 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 	}()
 
 	// issue fake event to trigger a first time sync
-	go func() {
-		l.Info(
-			"issuing fake IMAP Event for first time sync (skipping post-commands)")
-		self.idleEvent <- &box.IDLE{
-			Reason: box.Sync,
-			Box:    self.box,
-		}
-	}()
+	if self.startupSync {
+		go func() {
+			l.Info(
+				"issuing fake IMAP Event for first time sync (skipping post-commands)")
+			self.idleEvent <- &box.IDLE{
+				Reason: box.Sync,
+				Box:    self.box,
+			}
+		}()
+	}
 
 	select {
 	case <-self.quit:

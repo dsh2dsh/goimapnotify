@@ -231,7 +231,8 @@ accountLoop:
 	for _, account := range boxes {
 		var connected bool
 		for _, mailbox := range account.Boxes {
-			wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan)
+			wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan).
+				WithStartupSync(topConfig.StartupSync)
 			client, err := imap.New(mailbox.Account(), flagRetries,
 				imap.WithWatcher(wb))
 			if errors.Is(err, imap.ErrLoginFailed) {
@@ -243,7 +244,7 @@ accountLoop:
 					slog.String("account", account.Alias), slog.Any("error", err))
 				wg.Go(func() {
 					reconnectWatcher(&imap.BoxEvent{Mailbox: mailbox},
-						idleChan, boxChan, quitChan, flagRetries)
+						idleChan, boxChan, quitChan, flagRetries, topConfig.StartupSync)
 				})
 				watching++
 				continue
@@ -287,7 +288,8 @@ idleLoop:
 				slog.String("mailbox", mailbox.Mailbox))
 
 			wg.Go(func() {
-				reconnectWatcher(boxEvent, idleChan, boxChan, quitChan, flagRetries)
+				reconnectWatcher(boxEvent, idleChan, boxChan, quitChan, flagRetries,
+					topConfig.StartupSync)
 			})
 
 		case <-quit:
@@ -345,6 +347,7 @@ func reconnectWatcher(
 	boxChan chan<- *imap.BoxEvent,
 	quitChan <-chan struct{},
 	retries int,
+	startupSync bool,
 ) {
 	mailbox := event.Mailbox
 	l := slog.With(
@@ -360,7 +363,8 @@ func reconnectWatcher(
 			return
 		}
 
-		wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan)
+		wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan).
+			WithStartupSync(startupSync)
 		client, err := imap.New(mailbox.Account(), retries, imap.WithWatcher(wb))
 		if errors.Is(err, imap.ErrLoginFailed) {
 			l.Error("Reconnection failed", slog.Any("error", err))

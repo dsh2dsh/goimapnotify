@@ -18,6 +18,7 @@ package config
 
 // Configuration holds the top-level configuration
 type Configuration struct {
+	StartupSync    bool            `yaml:"startupSync"`
 	Configurations []*NotifyConfig `yaml:"configurations" json:"configurations"`
 }
 
