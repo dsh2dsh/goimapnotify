@@ -17,15 +17,13 @@ package runner
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"sync"
-	"text/template"
 	"time"
 
+	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/command"
-	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 // RunningBox manages command scheduling and execution
@@ -49,18 +47,20 @@ func NewRunningBox(debug bool, wait int) *RunningBox {
 }
 
 // Schedule debounces events before queueing them for execution
-func (r *RunningBox) Schedule(rsp *config.IDLEEvent, done <-chan struct{}, queue chan *config.IDLEEvent) {
+func (r *RunningBox) Schedule(rsp *box.IDLE, done <-chan struct{},
+	queue chan *box.IDLE,
+) {
 	l := slog.With(
-		slog.String("alias", rsp.Alias),
-		slog.String("mailbox", rsp.Mailbox),
-	)
-	if ShouldSkip(rsp.Box) {
+		slog.String("alias", rsp.Alias()),
+		slog.String("mailbox", rsp.Mailbox()))
+
+	if rsp.Skip() {
 		l.Warn("No command for event, skipping scheduling...",
 			slog.String("reason", rsp.Reason.String()))
 		return
 	}
 
-	key := rsp.Alias + rsp.Mailbox
+	key := rsp.Alias() + rsp.Mailbox()
 	wait := time.Duration(r.Wait) * time.Second
 	when := time.Now().Add(wait).Format(time.RFC850)
 
@@ -97,105 +97,36 @@ func (r *RunningBox) Schedule(rsp *config.IDLEEvent, done <-chan struct{}, queue
 }
 
 // Run executes commands based on the event type
-func (r *RunningBox) Run(rsp *config.IDLEEvent) error {
+func (r *RunningBox) Run(rsp *box.IDLE) error {
 	l := slog.With(
-		slog.String("alias", rsp.Alias),
-		slog.String("mailbox", rsp.Mailbox),
-	)
+		slog.String("alias", rsp.Alias()),
+		slog.String("mailbox", rsp.Mailbox()))
 	if r.Debug {
 		l.Info("Running synchronization...")
 	}
 
-	switch rsp.Reason {
-	case config.NEWMAIL:
-		err := prepareAndRun(rsp.Box.OnNewMail, rsp.Box.OnNewMailPost, rsp)
-		if err != nil {
-			return err
-		}
-	case config.FLAGCHANGED:
-		err := prepareAndRun(rsp.Box.OnChangedMail, rsp.Box.OnChangedMailPost, rsp)
-		if err != nil {
-			return err
-		}
-	case config.DELETEDMAIL:
-		err := prepareAndRun(rsp.Box.OnDeletedMail, rsp.Box.OnDeletedMailPost, rsp)
-		if err != nil {
-			return err
-		}
-	case config.SYNC:
-		err := prepareAndRun(rsp.Box.OnNewMail, "", rsp)
-		if err != nil {
-			return err
-		}
-	default:
-		l.Error("unknown reason value, ignoring...",
-			slog.String("reason", rsp.Reason.String()))
-	}
-	return nil
-}
-
-func prepareAndRun(on, onpost string, event *config.IDLEEvent) error {
-	callKind := "New"
-	if event.Reason == config.DELETEDMAIL {
-		callKind = "Deleted"
-	}
-	if event.Reason == config.FLAGCHANGED {
-		callKind = "Changed"
-	}
-	if event.Reason == config.SYNC {
-		callKind = "Sync"
-	}
-
-	if on == "SKIP" || on == "" {
+	onCommand, err := rsp.Box.RenderCommand(rsp)
+	if err != nil {
+		return err
+	} else if onCommand == "" || onCommand == "SKIP" {
 		return nil
 	}
 
-	var bufOn bytes.Buffer
-	tOn, err := template.New("run").Parse(on)
-	if err != nil {
-		return fmt.Errorf("cannot compile template for 'on' command, error: %w", err)
-	}
-	err = tOn.Execute(&bufOn, event)
-	if err != nil {
-		return fmt.Errorf("there was an error while executing the template, error: %w", err)
+	cmd := command.New(onCommand)
+	if err := execCommand(cmd, onCommand); err != nil {
+		return fmt.Errorf("%s command failed: %w", rsp.CommandName(), err)
 	}
 
-	call := command.New(bufOn.String())
-	if err := execCommand(call, bufOn.String()); err != nil {
-		return fmt.Errorf("On%sMail command failed: %w", callKind, err)
-	}
-
-	if onpost == "SKIP" || onpost == "" {
+	postCommand, err := rsp.Box.RenderPostCommand(rsp)
+	if err != nil {
+		return err
+	} else if postCommand == "" || postCommand == "SKIP" {
 		return nil
 	}
 
-	bufOnPost := bytes.NewBuffer(nil)
-	tOnPost, err := template.New("run").Parse(onpost)
-	if err != nil {
-		return fmt.Errorf("cannot compile template for 'onPost' command, error: %w", err)
-	}
-	err = tOnPost.Execute(bufOnPost, event)
-	if err != nil {
-		return fmt.Errorf("there was an error while executing the template, error: %w", err)
-	}
-
-	call = command.New(bufOnPost.String())
-	if err := execCommand(call, bufOnPost.String()); err != nil {
-		return fmt.Errorf("On%sMailPost command failed: %w", callKind, err)
+	cmd = command.New(postCommand)
+	if err := execCommand(cmd, postCommand); err != nil {
+		return fmt.Errorf("%sPost command failed: %w", rsp.CommandName(), err)
 	}
 	return nil
-}
-
-// ShouldSkip checks if the event should be skipped based on the Box configuration
-func ShouldSkip(b *config.Box) bool {
-	switch b.Reason {
-	case config.NEWMAIL:
-		return b.OnNewMail == "" || b.OnNewMail == "SKIP"
-	case config.FLAGCHANGED:
-		return b.OnChangedMail == "" || b.OnChangedMail == "SKIP"
-	case config.DELETEDMAIL:
-		return b.OnDeletedMail == "" || b.OnDeletedMail == "SKIP"
-	}
-
-	return false
 }

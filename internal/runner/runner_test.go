@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
@@ -67,128 +70,26 @@ func TestNewRunningBox(t *testing.T) {
 	}
 }
 
-// TestShouldSkip tests the ShouldSkip function
-func TestShouldSkip(t *testing.T) {
-	tests := []struct {
-		name     string
-		box      config.Box
-		expected bool
-	}{
-		// NEWMAIL tests
-		{
-			name: "NEWMAIL with empty OnNewMail",
-			box: config.Box{
-				Reason:    config.NEWMAIL,
-				OnNewMail: "",
-			},
-			expected: true,
-		},
-		{
-			name: "NEWMAIL with SKIP OnNewMail",
-			box: config.Box{
-				Reason:    config.NEWMAIL,
-				OnNewMail: "SKIP",
-			},
-			expected: true,
-		},
-		{
-			name: "NEWMAIL with valid OnNewMail",
-			box: config.Box{
-				Reason:    config.NEWMAIL,
-				OnNewMail: "echo hello",
-			},
-			expected: false,
-		},
-		// FLAGCHANGED tests
-		{
-			name: "FLAGCHANGED with empty OnChangedMail",
-			box: config.Box{
-				Reason:        config.FLAGCHANGED,
-				OnChangedMail: "",
-			},
-			expected: true,
-		},
-		{
-			name: "FLAGCHANGED with SKIP OnChangedMail",
-			box: config.Box{
-				Reason:        config.FLAGCHANGED,
-				OnChangedMail: "SKIP",
-			},
-			expected: true,
-		},
-		{
-			name: "FLAGCHANGED with valid OnChangedMail",
-			box: config.Box{
-				Reason:        config.FLAGCHANGED,
-				OnChangedMail: "echo changed",
-			},
-			expected: false,
-		},
-		// DELETEDMAIL tests
-		{
-			name: "DELETEDMAIL with empty OnDeletedMail",
-			box: config.Box{
-				Reason:        config.DELETEDMAIL,
-				OnDeletedMail: "",
-			},
-			expected: true,
-		},
-		{
-			name: "DELETEDMAIL with SKIP OnDeletedMail",
-			box: config.Box{
-				Reason:        config.DELETEDMAIL,
-				OnDeletedMail: "SKIP",
-			},
-			expected: true,
-		},
-		{
-			name: "DELETEDMAIL with valid OnDeletedMail",
-			box: config.Box{
-				Reason:        config.DELETEDMAIL,
-				OnDeletedMail: "echo deleted",
-			},
-			expected: false,
-		},
-		// Unknown reason
-		{
-			name: "unknown reason returns false",
-			box: config.Box{
-				Reason: config.EventType(99),
-			},
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ShouldSkip(&tt.box)
-			if result != tt.expected {
-				t.Errorf("ShouldSkip() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
-
 // TestRunningBox_Schedule_SkipsWhenNoCommand tests that Schedule skips when no command is configured
 func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Reason:    config.NEWMAIL,
-			OnNewMail: "", // Empty - should skip
-		},
+	event := box.IDLE{
+		Reason: box.NewMail,
+		Box: (&box.Box{
+			Box: &config.Box{
+				Mailbox:   "INBOX",
+				OnNewMail: "", // Empty - should skip
+			},
+		}).WithAccount(&config.NotifyConfig{Alias: "test@example.com"}),
 	}
 
 	done := make(chan struct{})
-	queue := make(chan *config.IDLEEvent, 1)
+	queue := make(chan *box.IDLE, 1)
 
 	// Run Schedule in a goroutine
 	var wg sync.WaitGroup
-	wg.Go(func() { rb.Schedule(event, done, queue) })
+	wg.Go(func() { rb.Schedule(&event, done, queue) })
 
 	// Give it a moment
 	time.Sleep(50 * time.Millisecond)
@@ -209,30 +110,36 @@ func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 	rb := NewRunningBox(false, 0) // 0 second wait for fast test
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo hello",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo hello",
+			},
 		},
 	}
 
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
 	done := make(chan struct{})
-	queue := make(chan *config.IDLEEvent, 1)
+	queue := make(chan *box.IDLE, 1)
 
 	// Run Schedule in a goroutine
-	go rb.Schedule(event, done, queue)
+	go rb.Schedule(&event, done, queue)
 
 	// Wait for the event to be queued
 	select {
 	case received := <-queue:
-		if received.Alias != event.Alias {
-			t.Errorf("received Alias = %q, want %q", received.Alias, event.Alias)
+		if received.Alias() != event.Alias() {
+			t.Errorf("received Alias = %q, want %q", received.Alias(), event.Alias())
 		}
-		if received.Mailbox != event.Mailbox {
-			t.Errorf("received Mailbox = %q, want %q", received.Mailbox, event.Mailbox)
+		if received.Mailbox() != event.Mailbox() {
+			t.Errorf("received Mailbox = %q, want %q", received.Mailbox(), event.Mailbox())
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timeout waiting for event to be queued")
@@ -245,22 +152,28 @@ func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 func TestRunningBox_Schedule_Debouncing(t *testing.T) {
 	rb := NewRunningBox(false, 1) // 1 second wait
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo hello",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo hello",
+			},
 		},
 	}
 
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
 	done := make(chan struct{})
-	queue := make(chan *config.IDLEEvent, 10)
+	queue := make(chan *box.IDLE, 10)
 
 	// Start multiple Schedule calls rapidly
 	for range 5 {
-		go rb.Schedule(event, done, queue)
+		go rb.Schedule(&event, done, queue)
 		time.Sleep(100 * time.Millisecond) // Trigger reschedules
 	}
 
@@ -291,23 +204,29 @@ drainLoop:
 func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 	rb := NewRunningBox(false, 10) // Long wait time
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo hello",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo hello",
+			},
 		},
 	}
 
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
 	done := make(chan struct{})
-	queue := make(chan *config.IDLEEvent, 1)
+	queue := make(chan *box.IDLE, 1)
 
 	// Run Schedule in a goroutine
 	scheduleReturned := make(chan struct{})
 	go func() {
-		rb.Schedule(event, done, queue)
+		rb.Schedule(&event, done, queue)
 		close(scheduleReturned)
 	}()
 
@@ -338,32 +257,33 @@ func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 	rb := NewRunningBox(false, 0) // 0 second wait for fast test
 
-	event1 := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo inbox",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo inbox",
+			},
+			{
+				Mailbox:   "Sent",
+				OnNewMail: "echo sent",
+			},
 		},
 	}
 
-	event2 := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "Sent",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo sent",
-		},
-	}
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.Len(t, boxes, 2)
+
+	event1 := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event2 := box.IDLE{Reason: box.NewMail, Box: boxes[1]}
 
 	done := make(chan struct{})
-	queue := make(chan *config.IDLEEvent, 10)
+	queue := make(chan *box.IDLE, 10)
 
 	// Schedule events for different mailboxes
-	go rb.Schedule(event1, done, queue)
-	go rb.Schedule(event2, done, queue)
+	go rb.Schedule(&event1, done, queue)
+	go rb.Schedule(&event2, done, queue)
 
 	// Wait for both events
 	received := make(map[string]bool)
@@ -372,7 +292,7 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 	for range 2 {
 		select {
 		case event := <-queue:
-			received[event.Mailbox] = true
+			received[event.Mailbox()] = true
 		case <-timeout:
 			t.Fatalf("timeout waiting for events, received: %v", received)
 		}
@@ -392,18 +312,23 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 func TestRunningBox_Run_NewMail(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo 'new mail'",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo 'new mail'",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -413,18 +338,23 @@ func TestRunningBox_Run_NewMail(t *testing.T) {
 func TestRunningBox_Run_FlagChanged(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.FLAGCHANGED,
-		Box: &config.Box{
-			Mailbox:       "INBOX",
-			Reason:        config.FLAGCHANGED,
-			OnChangedMail: "echo 'flag changed'",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:       "INBOX",
+				OnChangedMail: "echo 'flag changed'",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.FlagChanged, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -434,18 +364,23 @@ func TestRunningBox_Run_FlagChanged(t *testing.T) {
 func TestRunningBox_Run_DeletedMail(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.DELETEDMAIL,
-		Box: &config.Box{
-			Mailbox:       "INBOX",
-			Reason:        config.DELETEDMAIL,
-			OnDeletedMail: "echo 'deleted mail'",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:       "INBOX",
+				OnDeletedMail: "echo 'deleted mail'",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.DeletedMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -455,18 +390,23 @@ func TestRunningBox_Run_DeletedMail(t *testing.T) {
 func TestRunningBox_Run_SkipsEmptyCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "", // Empty command
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "", // Empty command
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() should not error on empty command, got: %v", err)
 	}
@@ -476,18 +416,23 @@ func TestRunningBox_Run_SkipsEmptyCommand(t *testing.T) {
 func TestRunningBox_Run_SkipsSKIPCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "SKIP",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "SKIP",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() should not error on SKIP command, got: %v", err)
 	}
@@ -497,19 +442,24 @@ func TestRunningBox_Run_SkipsSKIPCommand(t *testing.T) {
 func TestRunningBox_Run_WithPostCommand(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:       "INBOX",
-			Reason:        config.NEWMAIL,
-			OnNewMail:     "echo 'new mail'",
-			OnNewMailPost: "echo 'post sync'",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:       "INBOX",
+				OnNewMail:     "echo 'new mail'",
+				OnNewMailPost: "echo 'post sync'",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -519,18 +469,23 @@ func TestRunningBox_Run_WithPostCommand(t *testing.T) {
 func TestRunningBox_Run_CommandFailure(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "exit 1", // Command that fails
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "exit 1", // Command that fails
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err == nil {
 		t.Error("Run() should return error on command failure")
 	}
@@ -540,19 +495,24 @@ func TestRunningBox_Run_CommandFailure(t *testing.T) {
 func TestRunningBox_Run_PostCommandFailure(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:       "INBOX",
-			Reason:        config.NEWMAIL,
-			OnNewMail:     "echo 'success'",
-			OnNewMailPost: "exit 1", // Post command that fails
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:       "INBOX",
+				OnNewMail:     "echo 'success'",
+				OnNewMailPost: "exit 1", // Post command that fails
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err == nil {
 		t.Error("Run() should return error on post command failure")
 	}
@@ -562,38 +522,48 @@ func TestRunningBox_Run_PostCommandFailure(t *testing.T) {
 func TestRunningBox_Run_UnknownReason(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.EventType(99), // Unknown reason
-		Box: &config.Box{
-			Mailbox: "INBOX",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox: "INBOX",
+			},
 		},
 	}
 
-	err := rb.Run(event)
-	if err != nil {
-		t.Errorf("Run() should not error on unknown reason, got: %v", err)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{
+		Reason: box.EventType(99), // Unknown reason
+		Box:    boxes[0],
 	}
+
+	require.Error(t, rb.Run(&event))
 }
 
 // TestRunningBox_Run_WithTemplate tests Run handles templates in commands
 func TestRunningBox_Run_WithTemplate(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Alias:     "test@example.com",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo '{{.Mailbox}} for {{.Alias}}'",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo '{{.Mailbox}} for {{.Alias}}'",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -601,62 +571,58 @@ func TestRunningBox_Run_WithTemplate(t *testing.T) {
 
 // TestRunningBox_Run_InvalidTemplate tests Run handles invalid templates
 func TestRunningBox_Run_InvalidTemplate(t *testing.T) {
-	rb := NewRunningBox(false, 1)
-
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo '{{.InvalidField'", // Invalid template syntax
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo '{{.InvalidField'", // Invalid template syntax
+			},
 		},
 	}
 
-	err := rb.Run(event)
-	if err == nil {
-		t.Error("Run() should return error on invalid template")
-	}
+	_, err := box.NewFromConfig(&notifyConfig)
+	require.Error(t, err)
 }
 
 // TestRunningBox_Run_TemplateExecutionError tests Run handles template execution errors
 func TestRunningBox_Run_TemplateExecutionError(t *testing.T) {
-	rb := NewRunningBox(false, 1)
-
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:   "INBOX",
-			Reason:    config.NEWMAIL,
-			OnNewMail: "echo '{{.NonExistentMethod}}'", // Valid syntax but will cause execution issues
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:   "INBOX",
+				OnNewMail: "echo '{{.NonExistentMethod}}'", // Valid syntax but will cause execution issues
+			},
 		},
 	}
 
-	// This might or might not error depending on Go's template behavior
-	// Just ensure it doesn't panic
-	_ = rb.Run(event)
+	_, err := box.NewFromConfig(&notifyConfig)
+	require.Error(t, err)
 }
 
 // TestRunningBox_Run_PostCommandSkipped tests Run skips post command when set to SKIP
 func TestRunningBox_Run_PostCommandSkipped(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:       "INBOX",
-			Reason:        config.NEWMAIL,
-			OnNewMail:     "echo 'new mail'",
-			OnNewMailPost: "SKIP",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:       "INBOX",
+				OnNewMail:     "echo 'new mail'",
+				OnNewMailPost: "SKIP",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -666,19 +632,24 @@ func TestRunningBox_Run_PostCommandSkipped(t *testing.T) {
 func TestRunningBox_Run_PostCommandEmpty(t *testing.T) {
 	rb := NewRunningBox(true, 1)
 
-	event := &config.IDLEEvent{
-		Alias:   "test@example.com",
-		Mailbox: "INBOX",
-		Reason:  config.NEWMAIL,
-		Box: &config.Box{
-			Mailbox:       "INBOX",
-			Reason:        config.NEWMAIL,
-			OnNewMail:     "echo 'new mail'",
-			OnNewMailPost: "",
+	notifyConfig := config.NotifyConfig{
+		Alias: "test@example.com",
+		Boxes: []*config.Box{
+			{
+				Mailbox:       "INBOX",
+				OnNewMail:     "echo 'new mail'",
+				OnNewMailPost: "",
+			},
 		},
 	}
 
-	err := rb.Run(event)
+	boxes, err := box.NewFromConfig(&notifyConfig)
+	require.NoError(t, err)
+	require.NotEmpty(t, boxes)
+
+	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+
+	err = rb.Run(&event)
 	if err != nil {
 		t.Errorf("Run() error = %v", err)
 	}
@@ -688,33 +659,30 @@ func TestRunningBox_Run_PostCommandEmpty(t *testing.T) {
 func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 	tests := []struct {
 		name   string
-		reason config.EventType
+		reason box.EventType
 		box    config.Box
 	}{
 		{
 			name:   "NEWMAIL",
-			reason: config.NEWMAIL,
+			reason: box.NewMail,
 			box: config.Box{
 				Mailbox:   "INBOX",
-				Reason:    config.NEWMAIL,
 				OnNewMail: "echo 'new'",
 			},
 		},
 		{
 			name:   "FLAGCHANGED",
-			reason: config.FLAGCHANGED,
+			reason: box.FlagChanged,
 			box: config.Box{
 				Mailbox:       "INBOX",
-				Reason:        config.FLAGCHANGED,
 				OnChangedMail: "echo 'changed'",
 			},
 		},
 		{
 			name:   "DELETEDMAIL",
-			reason: config.DELETEDMAIL,
+			reason: box.DeletedMail,
 			box: config.Box{
 				Mailbox:       "INBOX",
-				Reason:        config.DELETEDMAIL,
 				OnDeletedMail: "echo 'deleted'",
 			},
 		},
@@ -723,14 +691,19 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rb := NewRunningBox(false, 1)
-			event := &config.IDLEEvent{
-				Alias:   "test@example.com",
-				Mailbox: "INBOX",
-				Reason:  tt.reason,
-				Box:     &tt.box,
+
+			notifyConfig := config.NotifyConfig{
+				Alias: "test@example.com",
+				Boxes: []*config.Box{&tt.box},
 			}
 
-			err := rb.Run(event)
+			boxes, err := box.NewFromConfig(&notifyConfig)
+			require.NoError(t, err)
+			require.NotEmpty(t, boxes)
+
+			event := box.IDLE{Reason: tt.reason, Box: boxes[0]}
+
+			err = rb.Run(&event)
 			if err != nil {
 				t.Errorf("Run() error = %v", err)
 			}
@@ -746,17 +719,26 @@ func TestRunningBox_Schedule_TimerMapIsolation(t *testing.T) {
 	users := []string{"user1@example.com", "user2@example.com", "user3@example.com"}
 
 	done := make(chan struct{})
-	queue := make(chan *config.IDLEEvent, 10)
+	queue := make(chan *box.IDLE, 10)
 
 	for _, user := range users {
-		event := &config.IDLEEvent{
-			Alias:   user,
-			Mailbox: "INBOX",
-			Reason:  config.NEWMAIL,
-			Box: &config.Box{
-				Reason:    config.NEWMAIL,
-				OnNewMail: "echo hello",
+		notifyConfig := config.NotifyConfig{
+			Alias: user,
+			Boxes: []*config.Box{
+				{
+					Mailbox:   "INBOX",
+					OnNewMail: "echo hello",
+				},
 			},
+		}
+
+		boxes, err := box.NewFromConfig(&notifyConfig)
+		require.NoError(t, err)
+		require.NotEmpty(t, boxes)
+
+		event := &box.IDLE{
+			Reason: box.NewMail,
+			Box:    boxes[0],
 		}
 		go rb.Schedule(event, done, queue)
 	}
@@ -768,7 +750,7 @@ func TestRunningBox_Schedule_TimerMapIsolation(t *testing.T) {
 	for range len(users) {
 		select {
 		case event := <-queue:
-			received[event.Alias] = true
+			received[event.Alias()] = true
 		case <-timeout:
 			t.Fatalf("timeout, received only: %v", received)
 		}

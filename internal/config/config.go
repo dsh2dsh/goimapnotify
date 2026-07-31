@@ -78,14 +78,11 @@ type TLSOptionsStruct struct {
 // IDLEEvent handler routine, in order to schedule commands and
 // print informative messages
 type Box struct {
-	Alias             string    `json:"-"                 yaml:"-"`
-	Mailbox           string    `json:"mailbox"           yaml:"mailbox"`
-	Reason            EventType `json:"-"                 yaml:"-"`
-	OnNewMail         string    `json:"onNewMail"         yaml:"onNewMail"`
-	OnNewMailPost     string    `json:"onNewMailPost"     yaml:"onNewMailPost"`
-	OnChangedMail     string    `json:"onChangedMail"     yaml:"onChangedMail"`
-	OnChangedMailPost string    `json:"onChangedMailPost" yaml:"onChangedMailPost"`
-	OnDeletedMail     string    `json:"onDeletedMail"     yaml:"onDeletedMail"`
-	OnDeletedMailPost string    `json:"onDeletedMailPost" yaml:"onDeletedMailPost"`
-	ExistingEmail     uint32    `json:"-"                 yaml:"-"`
+	Mailbox           string `json:"mailbox"           yaml:"mailbox"`
+	OnNewMail         string `json:"onNewMail"         yaml:"onNewMail"`
+	OnNewMailPost     string `json:"onNewMailPost"     yaml:"onNewMailPost"`
+	OnChangedMail     string `json:"onChangedMail"     yaml:"onChangedMail"`
+	OnChangedMailPost string `json:"onChangedMailPost" yaml:"onChangedMailPost"`
+	OnDeletedMail     string `json:"onDeletedMail"     yaml:"onDeletedMail"`
+	OnDeletedMailPost string `json:"onDeletedMailPost" yaml:"onDeletedMailPost"`
 }

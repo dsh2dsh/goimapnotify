@@ -32,6 +32,7 @@ import (
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/spf13/cobra"
 
+	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/cli/logger"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
@@ -159,13 +160,6 @@ func loadConfiguration(filename string, retries int,
 		}
 
 		if len(conf.Boxes) != 0 {
-			// replace all listed mailboxes with the same mailboxes carrying values
-			// from the configuration
-			for _, mailbox := range conf.Boxes {
-				if err := conf.FillBox(mailbox); err != nil {
-					return nil, fmt.Errorf("template is invalid: %w", err)
-				}
-			}
 			continue
 		}
 
@@ -191,12 +185,7 @@ func loadConfiguration(filename string, retries int,
 					continue mailboxLoop
 				}
 			}
-
-			box := &config.Box{Mailbox: mailbox.Mailbox}
-			if err := conf.FillBox(box); err != nil {
-				return nil, fmt.Errorf("template is invalid: %w", err)
-			}
-			conf.Boxes = append(conf.Boxes, box)
+			conf.Boxes = append(conf.Boxes, &config.Box{Mailbox: mailbox.Mailbox})
 		}
 	}
 	return cfg, nil
@@ -207,13 +196,19 @@ func Run() error {
 		return listMailboxes(topConfig)
 	}
 
+	boxes, err := boxesFromConfig(topConfig.Configurations)
+	if err != nil {
+		return fmt.Errorf("parse configurations: %w", err)
+	}
+
 	slog.Info("Running",
 		slog.String("commit", commit),
 		slog.String("tag", gittag),
-		slog.String("branch", branch))
+		slog.String("branch", branch),
+		slog.Int("boxes", len(boxes)))
 
-	idleChan := make(chan *config.IDLEEvent)
-	queueChan := make(chan *config.IDLEEvent, 100)
+	idleChan := make(chan *box.IDLE)
+	queueChan := make(chan *box.IDLE, 100)
 	boxChan := make(chan *imap.BoxEvent, 1)
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
@@ -231,18 +226,14 @@ func Run() error {
 
 	var wg sync.WaitGroup
 	var watching int
-	accounts := make(map[string]*config.NotifyConfig,
-		len(topConfig.Configurations))
 
 accountLoop:
-	for _, account := range topConfig.Configurations {
+	for _, account := range boxes {
 		var connected bool
 		for _, mailbox := range account.Boxes {
-			key := account.Alias + mailbox.Mailbox
-			accounts[key] = account
-
 			wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan)
-			client, err := imap.New(account, flagRetries, imap.WithWatcher(wb))
+			client, err := imap.New(mailbox.Account(), flagRetries,
+				imap.WithWatcher(wb))
 			if errors.Is(err, imap.ErrLoginFailed) {
 				slog.Error("Initial connection failed, skip all account mailboxes",
 					slog.String("account", account.Alias), slog.Any("error", err))
@@ -250,10 +241,9 @@ accountLoop:
 			} else if err != nil {
 				slog.Error("Initial connection failed, retrying in background",
 					slog.String("account", account.Alias), slog.Any("error", err))
-				mailbox.Alias = account.Alias
 				wg.Go(func() {
 					reconnectWatcher(&imap.BoxEvent{Mailbox: mailbox},
-						account, idleChan, boxChan, quitChan, flagRetries)
+						idleChan, boxChan, quitChan, flagRetries)
 				})
 				watching++
 				continue
@@ -291,14 +281,13 @@ idleLoop:
 				break idleLoop
 			}
 
+			mailbox := boxEvent.Mailbox
 			slog.Info("Restarting watcher for mailbox",
-				slog.String("alias", boxEvent.Mailbox.Alias),
-				slog.String("mailbox", boxEvent.Mailbox.Mailbox))
+				slog.String("alias", mailbox.Alias()),
+				slog.String("mailbox", mailbox.Mailbox))
 
-			key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
 			wg.Go(func() {
-				reconnectWatcher(boxEvent, accounts[key], idleChan, boxChan, quitChan,
-					flagRetries)
+				reconnectWatcher(boxEvent, idleChan, boxChan, quitChan, flagRetries)
 			})
 
 		case <-quit:
@@ -307,13 +296,15 @@ idleLoop:
 			break idleLoop
 
 		case idleEvent := <-idleChan:
-			wg.Go(func() { running.Schedule(idleEvent, quitChan, queueChan) })
+			if !idleEvent.Skip() {
+				wg.Go(func() { running.Schedule(idleEvent, quitChan, queueChan) })
+			}
 
 		case event := <-queueChan:
 			if err := running.Run(event); err != nil {
 				slog.Error("an error was encountered while executing commands for",
 					slog.String("reason", event.Reason.String()),
-					slog.String("alias", event.Alias),
+					slog.String("alias", event.Alias()),
 					slog.String("box", event.Box.Mailbox),
 					slog.Any("error", err))
 			}
@@ -330,17 +321,35 @@ idleLoop:
 	return nil
 }
 
+type accountBoxes struct {
+	*config.NotifyConfig
+
+	Boxes []*box.Box
+}
+
+func boxesFromConfig(c []*config.NotifyConfig) ([]accountBoxes, error) {
+	ab := make([]accountBoxes, len(c))
+	for i, a := range c {
+		boxes, err := box.NewFromConfig(a)
+		if err != nil {
+			return nil, err
+		}
+		ab[i] = accountBoxes{NotifyConfig: a, Boxes: boxes}
+	}
+	return ab, nil
+}
+
 func reconnectWatcher(
 	event *imap.BoxEvent,
-	cfg *config.NotifyConfig,
-	idleChan chan<- *config.IDLEEvent,
+	idleChan chan<- *box.IDLE,
 	boxChan chan<- *imap.BoxEvent,
 	quitChan <-chan struct{},
 	retries int,
 ) {
+	mailbox := event.Mailbox
 	l := slog.With(
-		slog.String("alias", event.Mailbox.Alias),
-		slog.String("mailbox", event.Mailbox.Mailbox))
+		slog.String("alias", mailbox.Alias()),
+		slog.String("mailbox", mailbox.Mailbox))
 	backoff := time.Second
 
 	for {
@@ -351,11 +360,11 @@ func reconnectWatcher(
 			return
 		}
 
-		wb := imap.NewWatchBox(event.Mailbox, idleChan, boxChan, quitChan)
-		client, err := imap.New(cfg, retries, imap.WithWatcher(wb))
+		wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan)
+		client, err := imap.New(mailbox.Account(), retries, imap.WithWatcher(wb))
 		if errors.Is(err, imap.ErrLoginFailed) {
 			l.Error("Reconnection failed", slog.Any("error", err))
-			boxChan <- &imap.BoxEvent{Mailbox: event.Mailbox, Skipped: true}
+			boxChan <- &imap.BoxEvent{Mailbox: mailbox, Skipped: true}
 			return
 		} else if err != nil {
 			backoff = min(backoff*2, maxBackoff)

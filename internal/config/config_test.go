@@ -23,69 +23,6 @@ import (
 	"go.yaml.in/yaml/v4"
 )
 
-// TestEventType_Constants tests that EventType constants have expected values
-func TestEventType_Constants(t *testing.T) {
-	// Verify constants are sequential starting from 1
-	if NEWMAIL != 1 {
-		t.Errorf("NEWMAIL = %d, want 1", NEWMAIL)
-	}
-	if DELETEDMAIL != 2 {
-		t.Errorf("DELETEDMAIL = %d, want 2", DELETEDMAIL)
-	}
-	if FLAGCHANGED != 3 {
-		t.Errorf("FLAGCHANGED = %d, want 3", FLAGCHANGED)
-	}
-}
-
-// TestEventType_String tests the String method of EventType
-func TestEventType_String(t *testing.T) {
-	tests := []struct {
-		name     string
-		event    EventType
-		expected string
-	}{
-		{
-			name:     "NEWMAIL",
-			event:    NEWMAIL,
-			expected: "New Email",
-		},
-		{
-			name:     "DELETEDMAIL",
-			event:    DELETEDMAIL,
-			expected: "Deleted Email",
-		},
-		{
-			name:     "FLAGCHANGED",
-			event:    FLAGCHANGED,
-			expected: "Changed Flag on Email",
-		},
-		{
-			name:     "Unknown event type 0",
-			event:    EventType(0),
-			expected: "Unknown Event",
-		},
-		{
-			name:     "Unknown event type 99",
-			event:    EventType(99),
-			expected: "Unknown Event",
-		},
-		{
-			name:     "Negative event type",
-			event:    EventType(-1),
-			expected: "Unknown Event",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := tt.event.String()
-			if result != tt.expected {
-				t.Errorf("String() = %q, want %q", result, tt.expected)
-			}
-		})
-	}
-}
-
 // TestLegacyConverter tests the LegacyConverter function
 func TestLegacyConverter(t *testing.T) {
 	legacy := ConfigurationLegacy{
@@ -372,49 +309,7 @@ func TestConfiguration_JSONSerialization(t *testing.T) {
 	}
 }
 
-// TestBox_JSONOmitsInternalFields tests that internal Box fields are omitted in JSON
-func TestBox_JSONOmitsInternalFields(t *testing.T) {
-	box := Box{
-		Alias:         "test@example.com", // Should be omitted (json:"-")
-		Mailbox:       "INBOX",
-		Reason:        NEWMAIL, // Should be omitted (json:"-")
-		OnNewMail:     "echo new",
-		ExistingEmail: 100, // Should be omitted (json:"-")
-	}
-
-	data, err := json.Marshal(box)
-	if err != nil {
-		t.Fatalf("json.Marshal() error = %v", err)
-	}
-
-	// Unmarshal to map to check fields
-	var result map[string]any
-	err = json.Unmarshal(data, &result)
-	if err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
-
-	// Internal fields should not be present
-	if _, ok := result["Alias"]; ok {
-		t.Error("Alias should be omitted from JSON")
-	}
-	if _, ok := result["Reason"]; ok {
-		t.Error("Reason should be omitted from JSON")
-	}
-	if _, ok := result["ExistingEmail"]; ok {
-		t.Error("ExistingEmail should be omitted from JSON")
-	}
-
-	// Public fields should be present
-	if _, ok := result["mailbox"]; !ok {
-		t.Error("mailbox should be present in JSON")
-	}
-	if _, ok := result["onNewMail"]; !ok {
-		t.Error("onNewMail should be present in JSON")
-	}
-}
-
-// TestTLSOptionsStruct tests TLSOptionsStruct serialization
+// TestTLSOptionsStructg tests TLSOptionsStruct serialization
 func TestTLSOptionsStruct_Serialization(t *testing.T) {
 	original := TLSOptionsStruct{
 		RejectUnauthorized: true,
@@ -459,36 +354,6 @@ func TestTLSOptionsStruct_Serialization(t *testing.T) {
 	}
 	if yamlResult.STARTTLS != original.STARTTLS {
 		t.Errorf("YAML STARTTLS = %v, want %v", yamlResult.STARTTLS, original.STARTTLS)
-	}
-}
-
-// TestIDLEEvent tests the IDLEEvent struct
-func TestIDLEEvent(t *testing.T) {
-	event := IDLEEvent{
-		Alias:         "test@example.com",
-		Mailbox:       "INBOX",
-		Reason:        NEWMAIL,
-		ExistingEmail: 10,
-		Box: &Box{
-			Mailbox:   "INBOX",
-			OnNewMail: "echo new",
-		},
-	}
-
-	if event.Alias != "test@example.com" {
-		t.Errorf("Alias = %q, want %q", event.Alias, "test@example.com")
-	}
-	if event.Mailbox != "INBOX" {
-		t.Errorf("Mailbox = %q, want %q", event.Mailbox, "INBOX")
-	}
-	if event.Reason != NEWMAIL {
-		t.Errorf("Reason = %v, want %v", event.Reason, NEWMAIL)
-	}
-	if event.ExistingEmail != 10 {
-		t.Errorf("ExistingEmail = %d, want %d", event.ExistingEmail, 10)
-	}
-	if event.Box.OnNewMail != "echo new" {
-		t.Errorf("Box.OnNewMail = %q, want %q", event.Box.OnNewMail, "echo new")
 	}
 }
 
@@ -572,28 +437,5 @@ func TestNotifyConfig_AllFields(t *testing.T) {
 
 	if result.Alias != conf.Alias {
 		t.Errorf("Alias = %q, want %q", result.Alias, conf.Alias)
-	}
-}
-
-// TestBox_AllFields tests that all Box fields work
-func TestBox_AllFields(t *testing.T) {
-	box := Box{
-		Alias:             "alias",
-		Mailbox:           "INBOX",
-		Reason:            NEWMAIL,
-		OnNewMail:         "new",
-		OnNewMailPost:     "new post",
-		OnChangedMail:     "changed",
-		OnChangedMailPost: "changed post",
-		OnDeletedMail:     "deleted",
-		OnDeletedMailPost: "deleted post",
-		ExistingEmail:     100,
-	}
-
-	if box.Alias != "alias" {
-		t.Errorf("Alias = %q, want %q", box.Alias, "alias")
-	}
-	if box.ExistingEmail != 100 {
-		t.Errorf("ExistingEmail = %d, want %d", box.ExistingEmail, 100)
 	}
 }

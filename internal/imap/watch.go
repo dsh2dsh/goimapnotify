@@ -23,7 +23,7 @@ import (
 	goimap "github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 
-	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/box"
 )
 
 func WithWatcher(w *WatchMailBox) option {
@@ -44,23 +44,23 @@ func WithWatcher(w *WatchMailBox) option {
 // BoxEvent helps in communication between the box watch launcher and the box
 // watching goroutines
 type BoxEvent struct {
-	Mailbox *config.Box
+	Mailbox *box.Box
 	Skipped bool
 }
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
 	client    *imapclient.Client
-	box       *config.Box
-	idleEvent chan<- *config.IDLEEvent
+	box       *box.Box
+	idleEvent chan<- *box.IDLE
 	boxEvent  chan<- *BoxEvent
 	quit      <-chan struct{}
 }
 
 // NewWatchBox creates a new instance of WatchMailBox and launches it
 func NewWatchBox(
-	m *config.Box,
-	i chan<- *config.IDLEEvent,
+	m *box.Box,
+	i chan<- *box.IDLE,
 	b chan<- *BoxEvent,
 	q <-chan struct{},
 ) *WatchMailBox {
@@ -75,23 +75,21 @@ func NewWatchBox(
 func (self *WatchMailBox) expunge(seqNum uint32) {
 	self.box.ExistingEmail = max(0, self.box.ExistingEmail-1)
 	slog.Info("IDLE expunge",
-		slog.String("account", self.box.Alias),
+		slog.String("account", self.box.Alias()),
 		slog.String("mailbox", self.box.Mailbox),
 		slog.Uint64("seq", uint64(seqNum)),
 		slog.Uint64("messages", uint64(self.box.ExistingEmail)))
 
 	// messages deleted
-	self.idleEvent <- &config.IDLEEvent{
-		Alias:   self.box.Alias,
-		Mailbox: self.box.Mailbox,
-		Reason:  config.DELETEDMAIL,
-		Box:     self.box,
+	self.idleEvent <- &box.IDLE{
+		Reason: box.DeletedMail,
+		Box:    self.box,
 	}
 }
 
 func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 	l := slog.With(
-		slog.String("account", self.box.Alias),
+		slog.String("account", self.box.Alias()),
 		slog.String("mailbox", self.box.Mailbox))
 
 	switch {
@@ -105,12 +103,9 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		if numMessages > self.box.ExistingEmail {
 			// messages arrived
 			self.box.ExistingEmail = numMessages
-			self.idleEvent <- &config.IDLEEvent{
-				Alias:         self.box.Alias,
-				Mailbox:       self.box.Mailbox,
-				Reason:        config.NEWMAIL,
-				ExistingEmail: int(numMessages),
-				Box:           self.box,
+			self.idleEvent <- &box.IDLE{
+				Reason: box.NewMail,
+				Box:    self.box,
 			}
 		}
 
@@ -123,11 +118,9 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		}
 
 		// messages flags updated
-		self.idleEvent <- &config.IDLEEvent{
-			Alias:   self.box.Alias,
-			Mailbox: self.box.Mailbox,
-			Reason:  config.FLAGCHANGED,
-			Box:     self.box,
+		self.idleEvent <- &box.IDLE{
+			Reason: box.FlagChanged,
+			Box:    self.box,
 		}
 	}
 	l.Info("IDLE mailbox")
@@ -137,7 +130,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 func (self *WatchMailBox) Watch(c *imapclient.Client) {
 	self.client = c
 	l := slog.With(
-		slog.String("alias", self.box.Alias),
+		slog.String("alias", self.box.Alias()),
 		slog.String("mailbox", self.box.Mailbox))
 
 	status, err := self.client.Select(self.box.Mailbox, &goimap.SelectOptions{
@@ -171,12 +164,9 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 	go func() {
 		l.Info(
 			"issuing fake IMAP Event for first time sync (skipping post-commands)")
-		self.idleEvent <- &config.IDLEEvent{
-			Alias:         self.box.Alias,
-			Mailbox:       self.box.Mailbox,
-			Reason:        config.SYNC,
-			ExistingEmail: 0,
-			Box:           self.box,
+		self.idleEvent <- &box.IDLE{
+			Reason: box.Sync,
+			Box:    self.box,
 		}
 	}()
 
