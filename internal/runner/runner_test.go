@@ -75,7 +75,7 @@ func TestRunningBox_Schedule_SkipsWhenNoCommand(t *testing.T) {
 	rb := NewRunningBox(false, 1)
 
 	event := box.IDLE{
-		Reason: box.NewMail,
+		Reason: box.EventNewMail,
 		Box: (&box.Box{
 			Box: &config.Box{
 				Mailbox:   "INBOX",
@@ -124,7 +124,7 @@ func TestRunningBox_Schedule_QueuesEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	done := make(chan struct{})
 	queue := make(chan *box.IDLE, 1)
@@ -166,7 +166,7 @@ func TestRunningBox_Schedule_Debouncing(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	done := make(chan struct{})
 	queue := make(chan *box.IDLE, 10)
@@ -218,7 +218,7 @@ func TestRunningBox_Schedule_StopsOnDone(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	done := make(chan struct{})
 	queue := make(chan *box.IDLE, 1)
@@ -275,8 +275,8 @@ func TestRunningBox_Schedule_DifferentMailboxes(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, boxes, 2)
 
-	event1 := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
-	event2 := box.IDLE{Reason: box.NewMail, Box: boxes[1]}
+	event1 := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
+	event2 := box.IDLE{Reason: box.EventNewMail, Box: boxes[1]}
 
 	done := make(chan struct{})
 	queue := make(chan *box.IDLE, 10)
@@ -326,7 +326,7 @@ func TestRunningBox_Run_NewMail(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -352,7 +352,7 @@ func TestRunningBox_Run_FlagChanged(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.FlagChanged, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventFlagChanged, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -378,7 +378,7 @@ func TestRunningBox_Run_DeletedMail(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.DeletedMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventDeletedMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -404,7 +404,7 @@ func TestRunningBox_Run_SkipsEmptyCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -430,7 +430,7 @@ func TestRunningBox_Run_SkipsSKIPCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -457,7 +457,7 @@ func TestRunningBox_Run_WithPostCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -483,7 +483,7 @@ func TestRunningBox_Run_CommandFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err == nil {
@@ -510,7 +510,7 @@ func TestRunningBox_Run_PostCommandFailure(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err == nil {
@@ -561,7 +561,7 @@ func TestRunningBox_Run_WithTemplate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -620,7 +620,7 @@ func TestRunningBox_Run_PostCommandSkipped(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -647,7 +647,7 @@ func TestRunningBox_Run_PostCommandEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, boxes)
 
-	event := box.IDLE{Reason: box.NewMail, Box: boxes[0]}
+	event := box.IDLE{Reason: box.EventNewMail, Box: boxes[0]}
 
 	err = rb.Run(&event)
 	if err != nil {
@@ -664,7 +664,7 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 	}{
 		{
 			name:   "NEWMAIL",
-			reason: box.NewMail,
+			reason: box.EventNewMail,
 			box: config.Box{
 				Mailbox:   "INBOX",
 				OnNewMail: "echo 'new'",
@@ -672,7 +672,7 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 		},
 		{
 			name:   "FLAGCHANGED",
-			reason: box.FlagChanged,
+			reason: box.EventFlagChanged,
 			box: config.Box{
 				Mailbox:       "INBOX",
 				OnChangedMail: "echo 'changed'",
@@ -680,7 +680,7 @@ func TestRunningBox_Run_AllEventTypes(t *testing.T) {
 		},
 		{
 			name:   "DELETEDMAIL",
-			reason: box.DeletedMail,
+			reason: box.EventDeletedMail,
 			box: config.Box{
 				Mailbox:       "INBOX",
 				OnDeletedMail: "echo 'deleted'",
@@ -737,7 +737,7 @@ func TestRunningBox_Schedule_TimerMapIsolation(t *testing.T) {
 		require.NotEmpty(t, boxes)
 
 		event := &box.IDLE{
-			Reason: box.NewMail,
+			Reason: box.EventNewMail,
 			Box:    boxes[0],
 		}
 		go rb.Schedule(event, done, queue)

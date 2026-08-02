@@ -89,7 +89,7 @@ func (self *WatchMailBox) expunge(seqNum uint32) {
 
 	// messages deleted
 	self.idleEvent <- &box.IDLE{
-		Reason: box.DeletedMail,
+		Reason: box.EventDeletedMail,
 		Box:    self.box,
 	}
 }
@@ -111,7 +111,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 			// messages arrived
 			self.box.ExistingEmail = numMessages
 			self.idleEvent <- &box.IDLE{
-				Reason: box.NewMail,
+				Reason: box.EventNewMail,
 				Box:    self.box,
 			}
 		}
@@ -126,7 +126,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 
 		// messages flags updated
 		self.idleEvent <- &box.IDLE{
-			Reason: box.FlagChanged,
+			Reason: box.EventFlagChanged,
 			Box:    self.box,
 		}
 	}
@@ -173,7 +173,7 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 			l.Info(
 				"issuing fake IMAP Event for first time sync (skipping post-commands)")
 			self.idleEvent <- &box.IDLE{
-				Reason: box.Sync,
+				Reason: box.EventSync,
 				Box:    self.box,
 			}
 		}()

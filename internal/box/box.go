@@ -185,7 +185,7 @@ func (self *Box) RenderCommand(e *IDLE) (string, error) {
 }
 
 func (self *Box) RenderPostCommand(e *IDLE) (string, error) {
-	if e.Reason == Sync {
+	if e.Reason == EventSync {
 		return "", nil
 	}
 	return self.renderCommand(e, true)
@@ -194,17 +194,17 @@ func (self *Box) RenderPostCommand(e *IDLE) (string, error) {
 func (self *Box) renderCommand(e *IDLE, post bool) (string, error) {
 	var t *template.Template
 	switch e.Reason {
-	case Sync, NewMail:
+	case EventSync, EventNewMail:
 		t = self.templateNewMail
 		if post {
 			t = self.templateNewMailPost
 		}
-	case DeletedMail:
+	case EventDeletedMail:
 		t = self.templateDeletedMail
 		if post {
 			t = self.templateDeletedMailPost
 		}
-	case FlagChanged:
+	case EventFlagChanged:
 		t = self.templateChangedMail
 		if post {
 			t = self.templateChangedMailPost

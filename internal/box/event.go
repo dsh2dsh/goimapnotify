@@ -3,21 +3,21 @@ package box
 type EventType int
 
 const (
-	NewMail EventType = iota + 1
-	DeletedMail
-	FlagChanged
-	Sync
+	EventSync EventType = iota
+	EventDeletedMail
+	EventFlagChanged
+	EventNewMail
 )
 
 func (self EventType) String() string {
 	switch self {
-	case NewMail:
+	case EventNewMail:
 		return "New Email"
-	case DeletedMail:
+	case EventDeletedMail:
 		return "Deleted Email"
-	case FlagChanged:
+	case EventFlagChanged:
 		return "Changed Flag on Email"
-	case Sync:
+	case EventSync:
 		return "Synchronize mailboxes without post-steps"
 	default:
 		return "Unknown Event"
@@ -35,11 +35,11 @@ func (self *IDLE) Mailbox() string { return self.Box.Mailbox }
 
 func (self *IDLE) Skip() bool {
 	switch self.Reason {
-	case Sync, NewMail:
+	case EventSync, EventNewMail:
 		return self.Box.SkipNewMail()
-	case FlagChanged:
+	case EventFlagChanged:
 		return self.Box.SkipChangedMail()
-	case DeletedMail:
+	case EventDeletedMail:
 		return self.Box.SkipDeletedMail()
 	}
 	return true
@@ -47,11 +47,11 @@ func (self *IDLE) Skip() bool {
 
 func (self *IDLE) CommandName() string {
 	switch self.Reason {
-	case Sync, NewMail:
+	case EventSync, EventNewMail:
 		return "onNewMail"
-	case DeletedMail:
+	case EventDeletedMail:
 		return "onDeletedMail"
-	case FlagChanged:
+	case EventFlagChanged:
 		return "onChangedMail"
 	}
 	return "unknown command"
