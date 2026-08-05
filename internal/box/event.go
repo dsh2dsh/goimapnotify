@@ -1,5 +1,13 @@
 package box
 
+import (
+	"bytes"
+	"io"
+	"iter"
+	"log/slog"
+	"sync"
+)
+
 type EventType int
 
 const (
@@ -7,6 +15,8 @@ const (
 	EventDeletedMail
 	EventFlagChanged
 	EventNewMail
+
+	maxEvents
 )
 
 func (self EventType) String() string {
@@ -45,7 +55,7 @@ func (self *IDLE) Skip() bool {
 	return true
 }
 
-func (self *IDLE) CommandName() string {
+func (self *IDLE) OnReason() string {
 	switch self.Reason {
 	case EventSync, EventNewMail:
 		return "onNewMail"
@@ -54,5 +64,85 @@ func (self *IDLE) CommandName() string {
 	case EventFlagChanged:
 		return "onChangedMail"
 	}
-	return "unknown command"
+	return "unknown reason"
+}
+
+func (self *IDLE) OnReasonPost() string {
+	switch self.Reason {
+	case EventSync, EventNewMail:
+		return "onNewMailPost"
+	case EventDeletedMail:
+		return "onDeletedMailPost"
+	case EventFlagChanged:
+		return "onChangedMailPost"
+	}
+	return "unknown reason"
+}
+
+type EventSet struct {
+	events [maxEvents]*IDLE
+	mu     sync.Mutex
+}
+
+func (self *EventSet) Add(e *IDLE) {
+	self.mu.Lock()
+	self.events[e.Reason] = e
+	self.mu.Unlock()
+}
+
+func (self *EventSet) Commands(l *slog.Logger) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		self.mu.Lock()
+		events := self.events
+		clear(self.events[:])
+		self.mu.Unlock()
+
+		seen := make(map[string]bool, len(events)*2)
+		var b bytes.Buffer
+
+	eventLoop:
+		for _, e := range events {
+			if e == nil {
+				continue
+			}
+
+			renderers := [...]struct {
+				onCommand func(io.Writer, *IDLE) error
+				onReason  func() string
+			}{
+				{
+					onCommand: e.Box.RenderCommandTo,
+					onReason:  e.OnReason,
+				},
+				{
+					onCommand: e.Box.RenderPostCommandTo,
+					onReason:  e.OnReasonPost,
+				},
+			}
+
+			for _, r := range renderers {
+				if err := r.onCommand(&b, e); err != nil {
+					yield("", err)
+					return
+				}
+
+				cmd := b.String()
+				b.Reset()
+				if cmd == "" || cmd == "SKIP" {
+					continue eventLoop
+				}
+
+				if seen[cmd] {
+					l.Debug("skip duplicate command for this mailbox",
+						slog.String("on", r.onReason()))
+					continue
+				}
+
+				seen[cmd] = true
+				if !yield(cmd, nil) {
+					return
+				}
+			}
+		}
+	}
 }

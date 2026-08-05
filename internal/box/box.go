@@ -1,7 +1,6 @@
 package box
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -180,18 +179,18 @@ func (self *Box) SkipDeletedMail() bool {
 	return self.templateDeletedMail == nil
 }
 
-func (self *Box) RenderCommand(e *IDLE) (string, error) {
-	return self.renderCommand(e, false)
+func (self *Box) RenderCommandTo(w io.Writer, e *IDLE) error {
+	return self.renderCommandTo(w, e, false)
 }
 
-func (self *Box) RenderPostCommand(e *IDLE) (string, error) {
+func (self *Box) RenderPostCommandTo(w io.Writer, e *IDLE) error {
 	if e.Reason == EventSync {
-		return "", nil
+		return nil
 	}
-	return self.renderCommand(e, true)
+	return self.renderCommandTo(w, e, true)
 }
 
-func (self *Box) renderCommand(e *IDLE, post bool) (string, error) {
+func (self *Box) renderCommandTo(w io.Writer, e *IDLE, post bool) error {
 	var t *template.Template
 	switch e.Reason {
 	case EventSync, EventNewMail:
@@ -210,23 +209,22 @@ func (self *Box) renderCommand(e *IDLE, post bool) (string, error) {
 			t = self.templateChangedMailPost
 		}
 	default:
-		return "", fmt.Errorf(
+		return fmt.Errorf(
 			"template not found, unknown IDLE reason=%v, post=%v", e.Reason, post)
 	}
 
 	if t == nil {
-		return "", nil
+		return nil
 	}
 
-	var b bytes.Buffer
-	if err := t.Execute(&b, e); err != nil {
+	if err := t.Execute(w, e); err != nil {
 		var name string
 		if post {
-			name = e.CommandName() + "Post"
+			name = e.OnReasonPost()
 		} else {
-			name = e.CommandName()
+			name = e.OnReason()
 		}
-		return "", fmt.Errorf("executing %s template: %w", name, err)
+		return fmt.Errorf("executing %s template: %w", name, err)
 	}
-	return b.String(), nil
+	return nil
 }

@@ -17,116 +17,31 @@ package runner
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"fmt"
-	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
-	"github.com/dsh2dsh/goimapnotify/internal/command"
 )
 
-// RunningBox manages command scheduling and execution
-type RunningBox struct {
-	Debug bool
-	Wait  int
-	/*
-	 * Use map to create a different timer for each
-	 * username-mailbox combination
-	 */
-	timer sync.Map
+type Runner struct {
+	wait     time.Duration
+	handlers map[*box.Box]*handler
 }
 
-// NewRunningBox creates a new RunningBox instance
-func NewRunningBox(debug bool, wait int) *RunningBox {
-	return &RunningBox{
-		Debug: debug,
-		Wait:  wait,
-		timer: sync.Map{},
+func New(n int, wait time.Duration) *Runner {
+	return &Runner{
+		wait:     wait * time.Second,
+		handlers: make(map[*box.Box]*handler, n),
 	}
 }
 
-// Schedule debounces events before queueing them for execution
-func (r *RunningBox) Schedule(rsp *box.IDLE, done <-chan struct{},
-	queue chan *box.IDLE,
-) {
-	l := slog.With(
-		slog.String("alias", rsp.Alias()),
-		slog.String("mailbox", rsp.Mailbox()))
-
-	if rsp.Skip() {
-		l.Warn("No command for event, skipping scheduling...",
-			slog.String("reason", rsp.Reason.String()))
+func (self *Runner) Schedule(e *box.IDLE, done <-chan struct{}) {
+	if h, ok := self.handlers[e.Box]; ok {
+		h.Schedule(e)
 		return
 	}
 
-	key := rsp.Alias() + rsp.Mailbox()
-	wait := time.Duration(r.Wait) * time.Second
-	when := time.Now().Add(wait).Format(time.RFC850)
-
-	value, exists := r.timer.LoadOrStore(key, time.NewTimer(wait))
-	wristwatch := value.(*time.Timer)
-
-	main := true // main is true for the goroutine that will run sync
-	if exists {
-		// Stop should be called before Reset according to go docs
-		if wristwatch.Stop() {
-			main = false // stopped running timer -> main is another goroutine
-		}
-		wristwatch.Reset(wait)
-		r.timer.Store(key, wristwatch)
-	}
-
-	if main {
-		l.Info("scheduled syncing",
-			slog.String("reason", rsp.Reason.String()),
-			slog.String("when", when),
-			slog.Duration("wait", wait))
-		select {
-		case <-wristwatch.C:
-			queue <- rsp
-		case <-done:
-			// just get out
-		}
-	} else {
-		l.Info("rescheduled syncing",
-			slog.String("reason", rsp.Reason.String()),
-			slog.String("when", when),
-			slog.Duration("wait", wait))
-	}
-}
-
-// Run executes commands based on the event type
-func (r *RunningBox) Run(rsp *box.IDLE) error {
-	l := slog.With(
-		slog.String("alias", rsp.Alias()),
-		slog.String("mailbox", rsp.Mailbox()))
-	if r.Debug {
-		l.Info("Running synchronization...")
-	}
-
-	onCommand, err := rsp.Box.RenderCommand(rsp)
-	if err != nil {
-		return err
-	} else if onCommand == "" || onCommand == "SKIP" {
-		return nil
-	}
-
-	cmd := command.New(onCommand)
-	if err := execCommand(cmd, onCommand); err != nil {
-		return fmt.Errorf("%s command failed: %w", rsp.CommandName(), err)
-	}
-
-	postCommand, err := rsp.Box.RenderPostCommand(rsp)
-	if err != nil {
-		return err
-	} else if postCommand == "" || postCommand == "SKIP" {
-		return nil
-	}
-
-	cmd = command.New(postCommand)
-	if err := execCommand(cmd, postCommand); err != nil {
-		return fmt.Errorf("%sPost command failed: %w", rsp.CommandName(), err)
-	}
-	return nil
+	h := NewHandler(e.Box, self.wait)
+	self.handlers[e.Box] = h
+	h.Schedule(e)
+	go h.Run(done)
 }

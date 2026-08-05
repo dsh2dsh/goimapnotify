@@ -51,7 +51,6 @@ var (
 	flagSyslog   bool
 	flagList     bool
 
-	debug     bool
 	topConfig *config.Configuration
 )
 
@@ -117,7 +116,6 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	switch strings.ToLower(flagLogLevel) {
 	case "debug":
 		logLevel = slog.LevelDebug
-		debug = true
 	case "info", "information":
 		logLevel = slog.LevelInfo
 	case "warn", "warning":
@@ -166,7 +164,7 @@ func Run() error {
 		return listMailboxes(topConfig)
 	}
 
-	boxes, err := boxesFromConfig(topConfig.Configurations, flagRetries)
+	n, boxes, err := boxesFromConfig(topConfig.Configurations, flagRetries)
 	if err != nil {
 		return fmt.Errorf("parse configurations: %w", err)
 	}
@@ -178,12 +176,11 @@ func Run() error {
 		slog.Int("boxes", len(boxes)))
 
 	idleChan := make(chan *box.IDLE)
-	queueChan := make(chan *box.IDLE, 100)
 	boxChan := make(chan *imap.BoxEvent, 1)
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
 
-	running := runner.NewRunningBox(debug, flagWait)
+	running := runner.New(n, time.Duration(flagWait))
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// Watch mailboxes events
@@ -269,16 +266,7 @@ idleLoop:
 
 		case idleEvent := <-idleChan:
 			if !idleEvent.Skip() {
-				wg.Go(func() { running.Schedule(idleEvent, quitChan, queueChan) })
-			}
-
-		case event := <-queueChan:
-			if err := running.Run(event); err != nil {
-				slog.Error("an error was encountered while executing commands for",
-					slog.String("reason", event.Reason.String()),
-					slog.String("alias", event.Alias()),
-					slog.String("box", event.Box.Mailbox),
-					slog.Any("error", err))
+				running.Schedule(idleEvent, quitChan)
 			}
 		}
 	}
@@ -300,7 +288,8 @@ type accountBoxes struct {
 }
 
 func boxesFromConfig(c []*config.NotifyConfig, retries int,
-) ([]accountBoxes, error) {
+) (int, []accountBoxes, error) {
+	var n int
 	ab := make([]accountBoxes, len(c))
 	for i, accountConfig := range c {
 		configuredBoxes := accountConfig.Boxes
@@ -308,7 +297,7 @@ func boxesFromConfig(c []*config.NotifyConfig, retries int,
 			// If there is no mailboxes, watch over all mailboxes of the account
 			boxes, err := boxesFromIMAP(accountConfig, retries)
 			if err != nil {
-				return nil, fmt.Errorf(
+				return 0, nil, fmt.Errorf(
 					"generate boxes configuration from IMAP: %w", err)
 			}
 			configuredBoxes = boxes
@@ -316,11 +305,12 @@ func boxesFromConfig(c []*config.NotifyConfig, retries int,
 
 		boxes, err := box.CompileBoxes(accountConfig, configuredBoxes)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		ab[i] = accountBoxes{NotifyConfig: accountConfig, Boxes: boxes}
+		n += len(boxes)
 	}
-	return ab, nil
+	return n, ab, nil
 }
 
 func boxesFromIMAP(account *config.NotifyConfig, retries int,
