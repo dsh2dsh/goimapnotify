@@ -24,6 +24,7 @@ import (
 
 type Runner struct {
 	wait     time.Duration
+	maxWait  time.Duration
 	handlers map[*box.Box]*handler
 }
 
@@ -34,13 +35,18 @@ func New(n int, wait time.Duration) *Runner {
 	}
 }
 
+func (self *Runner) WithMaxDelay(v time.Duration) *Runner {
+	self.maxWait = v
+	return self
+}
+
 func (self *Runner) Schedule(e *box.IDLE, done <-chan struct{}) {
 	if h, ok := self.handlers[e.Box]; ok {
 		h.Schedule(e)
 		return
 	}
 
-	h := NewHandler(e.Box, self.wait)
+	h := NewHandler(e.Box, self.wait).WithMaxDelay(self.maxWait)
 	self.handlers[e.Box] = h
 	h.Schedule(e)
 	go h.Run(done)

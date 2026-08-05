@@ -180,7 +180,8 @@ func Run() error {
 	quit := make(chan os.Signal, 1)
 	quitChan := make(chan struct{})
 
-	running := runner.New(n, time.Duration(flagWait))
+	running := runner.New(n, time.Duration(flagWait)).
+		WithMaxDelay(topConfig.MaxDelay)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// Watch mailboxes events

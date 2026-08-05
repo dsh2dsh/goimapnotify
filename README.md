@@ -36,6 +36,19 @@ testing.
 
   it skipped.
 
+* Configurable max delay
+
+  Every next IDLE event delays execution of commands for this mailbox. With
+  stream of many events this delay is increasing and increasing, until it
+  reaches `maxDelay`, which is 5 minutes by default. After that all commands
+  executed. The limit can be configured by top level option
+
+  ```yaml
+  maxDelay: "10m"
+  ```
+
+  Here we changed it from default 5 minutes to 10 minutes.
+
 ## Configuration
 
 This application is mostly compatible with the configuration of

@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // This file is part of goimapnotify
 // Copyright (C) 2017-2026	Jorge Javier Araya Navarro
 
@@ -18,6 +20,7 @@ package config
 
 // Configuration holds the top-level configuration
 type Configuration struct {
+	MaxDelay       time.Duration   `yaml:"maxDelay"`
 	StartupSync    bool            `yaml:"startupSync"`
 	Configurations []*NotifyConfig `yaml:"configurations" json:"configurations"`
 }

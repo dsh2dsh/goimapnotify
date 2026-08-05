@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"go.yaml.in/yaml/v4"
 )
@@ -15,6 +16,7 @@ func LoadYAML(filename string) (*Configuration, error) {
 	}
 
 	cfg := &Configuration{
+		MaxDelay:    5 * time.Minute,
 		StartupSync: true,
 	}
 	if err := yaml.Unmarshal(b, cfg); err != nil {
