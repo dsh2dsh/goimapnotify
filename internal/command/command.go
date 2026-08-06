@@ -17,15 +17,19 @@ package command
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"context"
 	"log/slog"
 	"os/exec"
 	"slices"
 )
 
-// New parses a string and returns a command executable by Go
 func New(command string) *exec.Cmd {
+	return NewContext(context.Background(), command)
+}
+
+func NewContext(ctx context.Context, command string) *exec.Cmd {
 	args := slices.Concat(Shell, []string{command})
 	slog.Debug("prepare command for exec",
 		slog.String("shell", args[0]), slog.Any("args", args[1:]))
-	return exec.Command(args[0], args[1:]...)
+	return exec.CommandContext(ctx, args[0], args[1:]...)
 }

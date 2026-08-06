@@ -77,7 +77,7 @@ func (self *handler) Run(ctx context.Context) {
 	for {
 		select {
 		case <-self.t.C:
-			if err := self.processEvents(); err != nil {
+			if err := self.processEvents(ctx); err != nil {
 				slog.Error("an error was encountered while executing commands for",
 					slog.String("alias", self.box.Alias()),
 					slog.String("box", self.box.Mailbox),
@@ -89,7 +89,7 @@ func (self *handler) Run(ctx context.Context) {
 	}
 }
 
-func (self *handler) processEvents() error {
+func (self *handler) processEvents(ctx context.Context) error {
 	self.reset()
 	defer self.completed()
 
@@ -103,7 +103,7 @@ func (self *handler) processEvents() error {
 			return err
 		}
 
-		cmd := command.New(s)
+		cmd := command.NewContext(ctx, s)
 		if err := execCommand(cmd, s); err != nil {
 			return err
 		}
