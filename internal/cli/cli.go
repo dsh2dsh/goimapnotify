@@ -243,8 +243,8 @@ idleLoop:
 				if watching == 0 {
 					stop()
 					slog.Error("nothing left to watch, exiting")
+					break idleLoop
 				}
-				break idleLoop
 			}
 
 			mailbox := boxEvent.Mailbox
