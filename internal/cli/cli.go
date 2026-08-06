@@ -127,6 +127,10 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 			flagLogLevel)
 	}
 
+	if flagWait < 1 {
+		return fmt.Errorf("invalid --wait: %d (must be >= 1)", flagWait)
+	}
+
 	if err := logger.InitializeDefaultLogger(logLevel, flagSyslog); err != nil {
 		return err
 	}
