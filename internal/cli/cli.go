@@ -181,20 +181,10 @@ func Run() error {
 
 	idleChan := make(chan *box.IDLE)
 	boxChan := make(chan *imap.BoxEvent, 1)
-	quit := make(chan os.Signal, 1)
-	quitChan := make(chan struct{})
 
-	running := runner.New(n, time.Duration(flagWait)).
-		WithMaxDelay(topConfig.MaxDelay)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	// Watch mailboxes events
-	// This kick-starts the watching
-	//
-	// I really doubt it that creating a new client for each mailbox that we want
-	// to listen for events is healthy, or elegant... but, if the connection
-	// fails, what the program does right now is exactly that: it creates a new
-	// client for that failing mailbox only, lol!
+	ctx, stop := signal.NotifyContext(context.Background(),
+		syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	var wg sync.WaitGroup
 	var watching int
@@ -203,7 +193,7 @@ accountLoop:
 	for _, account := range boxes {
 		var connected bool
 		for _, mailbox := range account.Boxes {
-			wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan).
+			wb := imap.NewWatchBox(mailbox, idleChan, boxChan).
 				WithStartupSync(topConfig.StartupSync)
 			client, err := imap.New(mailbox.Account(), flagRetries,
 				imap.WithWatcher(wb))
@@ -215,8 +205,8 @@ accountLoop:
 				slog.Error("Initial connection failed, retrying in background",
 					slog.String("account", account.Alias), slog.Any("error", err))
 				wg.Go(func() {
-					reconnectWatcher(&imap.BoxEvent{Mailbox: mailbox},
-						idleChan, boxChan, quitChan, flagRetries, topConfig.StartupSync)
+					reconnectWatcher(ctx, &imap.BoxEvent{Mailbox: mailbox},
+						idleChan, boxChan, flagRetries, topConfig.StartupSync)
 				})
 				watching++
 				continue
@@ -229,7 +219,7 @@ accountLoop:
 			}
 
 			wg.Go(func() {
-				wb.Watch(client)
+				wb.Watch(ctx, client)
 				_ = client.Close()
 			})
 			watching++
@@ -241,6 +231,9 @@ accountLoop:
 		return errors.New("nothing left to watch")
 	}
 
+	running := runner.New(n, time.Duration(flagWait)).
+		WithMaxDelay(topConfig.MaxDelay)
+
 idleLoop:
 	for {
 		select {
@@ -248,7 +241,7 @@ idleLoop:
 			if boxEvent.Skipped {
 				watching--
 				if watching == 0 {
-					close(quitChan)
+					stop()
 					slog.Error("nothing left to watch, exiting")
 				}
 				break idleLoop
@@ -260,18 +253,16 @@ idleLoop:
 				slog.String("mailbox", mailbox.Mailbox))
 
 			wg.Go(func() {
-				reconnectWatcher(boxEvent, idleChan, boxChan, quitChan, flagRetries,
+				reconnectWatcher(ctx, boxEvent, idleChan, boxChan, flagRetries,
 					topConfig.StartupSync)
 			})
 
-		case <-quit:
-			// OS asked nicely to close, we ask our goroutines to do the same
-			close(quitChan)
+		case <-ctx.Done():
 			break idleLoop
 
 		case idleEvent := <-idleChan:
 			if !idleEvent.Skip() {
-				running.Schedule(idleEvent, quitChan)
+				running.Schedule(ctx, idleEvent)
 			}
 		}
 	}
@@ -347,10 +338,10 @@ mailboxLoop:
 }
 
 func reconnectWatcher(
+	ctx context.Context,
 	event *imap.BoxEvent,
 	idleChan chan<- *box.IDLE,
 	boxChan chan<- *imap.BoxEvent,
-	quitChan <-chan struct{},
 	retries int,
 	startupSync bool,
 ) {
@@ -363,12 +354,12 @@ func reconnectWatcher(
 	for {
 		select {
 		case <-time.After(backoff):
-		case <-quitChan:
+		case <-ctx.Done():
 			l.Info("Reconnection cancelled, shutting down")
 			return
 		}
 
-		wb := imap.NewWatchBox(mailbox, idleChan, boxChan, quitChan).
+		wb := imap.NewWatchBox(mailbox, idleChan, boxChan).
 			WithStartupSync(startupSync)
 		client, err := imap.New(mailbox.Account(), retries, imap.WithWatcher(wb))
 		if errors.Is(err, imap.ErrLoginFailed) {
@@ -384,7 +375,7 @@ func reconnectWatcher(
 		}
 
 		l.Info("Reconnected successfully")
-		wb.Watch(client)
+		wb.Watch(ctx, client)
 		_ = client.Close()
 		return
 	}

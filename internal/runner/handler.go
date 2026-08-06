@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
@@ -72,7 +73,7 @@ func (self *handler) reschedule() (time.Duration, bool) {
 	return self.delayed, true
 }
 
-func (self *handler) Run(done <-chan struct{}) {
+func (self *handler) Run(ctx context.Context) {
 	for {
 		select {
 		case <-self.t.C:
@@ -82,7 +83,7 @@ func (self *handler) Run(done <-chan struct{}) {
 					slog.String("box", self.box.Mailbox),
 					slog.Any("error", err))
 			}
-		case <-done:
+		case <-ctx.Done():
 			return
 		}
 	}

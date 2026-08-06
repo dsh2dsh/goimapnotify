@@ -17,6 +17,7 @@ package runner
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"context"
 	"time"
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
@@ -40,7 +41,7 @@ func (self *Runner) WithMaxDelay(v time.Duration) *Runner {
 	return self
 }
 
-func (self *Runner) Schedule(e *box.IDLE, done <-chan struct{}) {
+func (self *Runner) Schedule(ctx context.Context, e *box.IDLE) {
 	if h, ok := self.handlers[e.Box]; ok {
 		h.Schedule(e)
 		return
@@ -49,5 +50,5 @@ func (self *Runner) Schedule(e *box.IDLE, done <-chan struct{}) {
 	h := NewHandler(e.Box, self.wait).WithMaxDelay(self.maxWait)
 	self.handlers[e.Box] = h
 	h.Schedule(e)
-	go h.Run(done)
+	go h.Run(ctx)
 }

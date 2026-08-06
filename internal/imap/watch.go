@@ -17,6 +17,7 @@ package imap
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
@@ -54,7 +55,6 @@ type WatchMailBox struct {
 	box       *box.Box
 	idleEvent chan<- *box.IDLE
 	boxEvent  chan<- *BoxEvent
-	quit      <-chan struct{}
 
 	startupSync bool
 }
@@ -64,13 +64,11 @@ func NewWatchBox(
 	m *box.Box,
 	i chan<- *box.IDLE,
 	b chan<- *BoxEvent,
-	q <-chan struct{},
 ) *WatchMailBox {
 	return &WatchMailBox{
 		box:       m,
 		idleEvent: i,
 		boxEvent:  b,
-		quit:      q,
 	}
 }
 
@@ -134,7 +132,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 }
 
 // Watch starts watching the mailbox for IDLE events
-func (self *WatchMailBox) Watch(c *imapclient.Client) {
+func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	self.client = c
 	l := slog.With(
 		slog.String("alias", self.box.Alias()),
@@ -180,7 +178,7 @@ func (self *WatchMailBox) Watch(c *imapclient.Client) {
 	}
 
 	select {
-	case <-self.quit:
+	case <-ctx.Done():
 		// the main event loop is asking us to stop
 		l.Info("stopping client watching mailbox")
 		if err := idleCmd.Close(); err != nil {
