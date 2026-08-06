@@ -258,6 +258,7 @@ idleLoop:
 			})
 
 		case <-ctx.Done():
+			stop()
 			break idleLoop
 
 		case idleEvent := <-idleChan:
@@ -268,7 +269,7 @@ idleLoop:
 	}
 
 	slog.Info("waiting other goroutines to stop...")
-	wg.Wait()
+	gracefulWait(&wg)
 	slog.Info("bye")
 
 	if watching == 0 {
@@ -386,4 +387,18 @@ func printConnected(l *slog.Logger, c *imapclient.Client) {
 		l = l.With(slog.Any("capabilities", caps))
 	}
 	l.Info("connected")
+}
+
+func gracefulWait(wg *sync.WaitGroup) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		slog.Warn("timed out waiting for other goroutines, abort")
+	case <-done:
+	}
 }
