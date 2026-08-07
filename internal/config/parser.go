@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -36,7 +37,7 @@ func LoadYAML(filename string) (*Configuration, error) {
 	invalid := len(cfg.Configurations) == 0 ||
 		(cfg.Configurations[0].Host == "" && cfg.Configurations[0].HostCMD == "")
 	if invalid {
-		return nil, fmt.Errorf(
+		return nil, errors.New(
 			"configuration file is empty or have invalid configuration format")
 	}
 
