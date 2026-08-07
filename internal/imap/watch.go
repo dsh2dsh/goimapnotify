@@ -86,10 +86,11 @@ func (self *WatchMailBox) expunge(seqNum uint32) {
 		slog.Uint64("messages", uint64(self.box.ExistingEmail)))
 
 	// messages deleted
-	self.idleEvent <- &box.IDLE{
-		Reason: box.EventDeletedMail,
-		Box:    self.box,
-	}
+	self.sendEvent(box.EventDeletedMail)
+}
+
+func (self *WatchMailBox) sendEvent(reason box.EventType) {
+	self.idleEvent <- box.NewEvent(self.box, reason)
 }
 
 func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
@@ -108,10 +109,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		if numMessages > self.box.ExistingEmail {
 			// messages arrived
 			self.box.ExistingEmail = numMessages
-			self.idleEvent <- &box.IDLE{
-				Reason: box.EventNewMail,
-				Box:    self.box,
-			}
+			self.sendEvent(box.EventNewMail)
 		}
 
 	case data.Flags != nil || data.PermanentFlags != nil:
@@ -123,10 +121,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		}
 
 		// messages flags updated
-		self.idleEvent <- &box.IDLE{
-			Reason: box.EventFlagChanged,
-			Box:    self.box,
-		}
+		self.sendEvent(box.EventFlagChanged)
 	}
 	l.Info("IDLE mailbox")
 }
@@ -163,7 +158,7 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	if self.startupSync {
 		l.Info(
 			"issuing fake IMAP Event for first time sync (skipping post-commands)")
-		self.idleEvent <- &box.IDLE{Reason: box.EventSync, Box: self.box}
+		self.sendEvent(box.EventSync)
 	}
 
 	done := make(chan error, 1)

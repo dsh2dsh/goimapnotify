@@ -35,28 +35,36 @@ func (self EventType) String() string {
 }
 
 type IDLE struct {
-	Reason EventType
-	Box    *Box
+	reason EventType
+	box    *Box
 }
 
-func (self *IDLE) Alias() string { return self.Box.Alias() }
+func NewEvent(box *Box, reason EventType) *IDLE {
+	return &IDLE{reason: reason, box: box}
+}
 
-func (self *IDLE) Mailbox() string { return self.Box.Mailbox }
+func (self *IDLE) Reason() EventType { return self.reason }
+
+func (self *IDLE) Box() *Box { return self.box }
+
+func (self *IDLE) Alias() string { return self.box.Alias() }
+
+func (self *IDLE) Mailbox() string { return self.box.Mailbox }
 
 func (self *IDLE) Skip() bool {
-	switch self.Reason {
+	switch self.reason {
 	case EventSync, EventNewMail:
-		return self.Box.SkipNewMail()
+		return self.box.SkipNewMail()
 	case EventFlagChanged:
-		return self.Box.SkipChangedMail()
+		return self.box.SkipChangedMail()
 	case EventDeletedMail:
-		return self.Box.SkipDeletedMail()
+		return self.box.SkipDeletedMail()
 	}
 	return true
 }
 
 func (self *IDLE) OnReason() string {
-	switch self.Reason {
+	switch self.reason {
 	case EventSync, EventNewMail:
 		return "onNewMail"
 	case EventDeletedMail:
@@ -68,7 +76,7 @@ func (self *IDLE) OnReason() string {
 }
 
 func (self *IDLE) OnReasonPost() string {
-	switch self.Reason {
+	switch self.reason {
 	case EventSync, EventNewMail:
 		return "onNewMailPost"
 	case EventDeletedMail:
@@ -86,7 +94,7 @@ type EventSet struct {
 
 func (self *EventSet) Add(e *IDLE) {
 	self.mu.Lock()
-	self.events[e.Reason] = e
+	self.events[e.reason] = e
 	self.mu.Unlock()
 }
 
@@ -111,11 +119,11 @@ func (self *EventSet) Commands(l *slog.Logger) iter.Seq2[string, error] {
 				onReason  func() string
 			}{
 				{
-					onCommand: e.Box.RenderCommandTo,
+					onCommand: e.Box().RenderCommandTo,
 					onReason:  e.OnReason,
 				},
 				{
-					onCommand: e.Box.RenderPostCommandTo,
+					onCommand: e.Box().RenderPostCommandTo,
 					onReason:  e.OnReasonPost,
 				},
 			}

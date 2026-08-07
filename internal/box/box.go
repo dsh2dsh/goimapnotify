@@ -152,7 +152,7 @@ func compileTemplate(s string) (*template.Template, error) {
 		Boxes: []*config.Box{&mailboxConfig},
 	}
 	box := Box{Box: &mailboxConfig}
-	data := IDLE{Box: box.WithAccount(&notifyConfig)}
+	data := IDLE{box: box.WithAccount(&notifyConfig)}
 
 	if err := t.Execute(io.Discard, &data); err != nil {
 		return nil, fmt.Errorf("exec template: %w", err)
@@ -184,7 +184,7 @@ func (self *Box) RenderCommandTo(w io.Writer, e *IDLE) error {
 }
 
 func (self *Box) RenderPostCommandTo(w io.Writer, e *IDLE) error {
-	if e.Reason == EventSync {
+	if e.Reason() == EventSync {
 		return nil
 	}
 	return self.renderCommandTo(w, e, true)
@@ -192,7 +192,7 @@ func (self *Box) RenderPostCommandTo(w io.Writer, e *IDLE) error {
 
 func (self *Box) renderCommandTo(w io.Writer, e *IDLE, post bool) error {
 	var t *template.Template
-	switch e.Reason {
+	switch e.Reason() {
 	case EventSync, EventNewMail:
 		t = self.templateNewMail
 		if post {
@@ -210,7 +210,7 @@ func (self *Box) renderCommandTo(w io.Writer, e *IDLE, post bool) error {
 		}
 	default:
 		return fmt.Errorf(
-			"template not found, unknown IDLE reason=%v, post=%v", e.Reason, post)
+			"template not found, unknown IDLE reason=%v, post=%v", e.Reason(), post)
 	}
 
 	if t == nil {

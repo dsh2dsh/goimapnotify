@@ -37,7 +37,7 @@ func (self *handler) Schedule(e *box.IDLE) {
 	d, ok := self.reschedule()
 
 	l := slog.With(
-		slog.String("reason", e.Reason.String()),
+		slog.String("reason", e.Reason().String()),
 		slog.String("alias", e.Alias()),
 		slog.String("mailbox", e.Mailbox()),
 		slog.Duration("wait", self.wait),

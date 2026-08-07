@@ -42,13 +42,13 @@ func (self *Runner) WithMaxDelay(v time.Duration) *Runner {
 }
 
 func (self *Runner) Schedule(ctx context.Context, e *box.IDLE) {
-	if h, ok := self.handlers[e.Box]; ok {
+	if h, ok := self.handlers[e.Box()]; ok {
 		h.Schedule(e)
 		return
 	}
 
-	h := NewHandler(e.Box, self.wait).WithMaxDelay(self.maxWait)
-	self.handlers[e.Box] = h
+	h := NewHandler(e.Box(), self.wait).WithMaxDelay(self.maxWait)
+	self.handlers[e.Box()] = h
 	h.Schedule(e)
 	go h.Run(ctx)
 }
