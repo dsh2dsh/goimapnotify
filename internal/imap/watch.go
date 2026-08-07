@@ -159,23 +159,18 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	}
 	defer idleCmd.Close()
 
+	// issue fake event to trigger a first time sync
+	if self.startupSync {
+		l.Info(
+			"issuing fake IMAP Event for first time sync (skipping post-commands)")
+		self.idleEvent <- &box.IDLE{Reason: box.EventSync, Box: self.box}
+	}
+
 	done := make(chan error, 1)
 	go func() {
 		l.Info("Watching mailbox")
 		done <- idleCmd.Wait()
 	}()
-
-	// issue fake event to trigger a first time sync
-	if self.startupSync {
-		go func() {
-			l.Info(
-				"issuing fake IMAP Event for first time sync (skipping post-commands)")
-			self.idleEvent <- &box.IDLE{
-				Reason: box.EventSync,
-				Box:    self.box,
-			}
-		}()
-	}
 
 	select {
 	case <-ctx.Done():
