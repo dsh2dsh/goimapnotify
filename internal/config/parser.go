@@ -37,8 +37,11 @@ func LoadYAML(filename string) (*Configuration, error) {
 		(cfg.Configurations[0].Host == "" && cfg.Configurations[0].HostCMD == "")
 	if invalid {
 		return nil, fmt.Errorf(
-			"configuration file %q is empty or have invalid configuration format",
-			filename)
+			"configuration file is empty or have invalid configuration format")
+	}
+
+	if err := validate(cfg); err != nil {
+		return nil, err
 	}
 	return cfg, nil
 }

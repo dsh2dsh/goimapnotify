@@ -20,9 +20,9 @@ import "time"
 
 // Configuration holds the top-level configuration
 type Configuration struct {
-	MaxDelay       time.Duration   `yaml:"maxDelay"`
+	MaxDelay       time.Duration   `yaml:"maxDelay" validate:"gt=0"`
 	StartupSync    bool            `yaml:"startupSync"`
-	Configurations []*NotifyConfig `yaml:"configurations" json:"configurations"`
+	Configurations []*NotifyConfig `yaml:"configurations" validate:"gt=0,dive,required"`
 }
 
 // ConfigurationLegacy holds the old configuration format
@@ -50,12 +50,12 @@ type ConfigurationLegacy struct {
 
 // NotifyConfig holds the configuration for a single account
 type NotifyConfig struct {
-	Host              string           `yaml:"host"              json:"host"`
+	Host              string           `yaml:"host"              json:"host" validate:"required"`
 	HostCMD           string           `yaml:"hostCMD"           json:"hostCMD"`
-	Port              int              `yaml:"port"              json:"port"`
+	Port              int              `yaml:"port"              json:"port" validate:"gt=0"`
 	TLS               bool             `yaml:"tls"               json:"tls"`
 	TLSOptions        TLSOptionsStruct `yaml:"tlsOptions"        json:"tlsOptions"`
-	IDLELogoutTimeout int              `yaml:"idleLogoutTimeout" json:"idleLogoutTimeout"`
+	IDLELogoutTimeout int              `yaml:"idleLogoutTimeout" json:"idleLogoutTimeout" validate:"min=0"`
 	EnableIDCommand   bool             `yaml:"enableIDCommand"   json:"enableIDCommand"`
 	Username          string           `yaml:"username"          json:"username"`
 	UsernameCMD       string           `yaml:"usernameCMD"       json:"usernameCMD"`
