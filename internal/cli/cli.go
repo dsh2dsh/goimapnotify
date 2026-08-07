@@ -128,7 +128,7 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if flagWait < 1 {
-		return fmt.Errorf("invalid --wait: %d (must be >= 1)", flagWait)
+		return fmt.Errorf("invalid --wait: %d (minimum value 1 second)", flagWait)
 	}
 
 	if err := logger.InitializeDefaultLogger(logLevel, flagSyslog); err != nil {
@@ -193,6 +193,10 @@ accountLoop:
 	for _, account := range boxes {
 		var connected bool
 		for _, mailbox := range account.Boxes {
+			if ctx.Err() != nil {
+				break accountLoop
+			}
+
 			wb := imap.NewWatchBox(mailbox, idleChan, boxChan).
 				WithStartupSync(topConfig.StartupSync)
 			client, err := imap.New(mailbox.Account(), flagRetries,
