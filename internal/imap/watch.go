@@ -45,9 +45,20 @@ func WithWatcher(w *WatchMailBox) option {
 // BoxEvent helps in communication between the box watch launcher and the box
 // watching goroutines
 type BoxEvent struct {
-	Mailbox *box.Box
-	Skipped bool
+	mailbox *box.Box
+	stop    bool
 }
+
+func NewBoxEvent(box *box.Box) *BoxEvent { return &BoxEvent{mailbox: box} }
+
+func (self *BoxEvent) Stop() *BoxEvent {
+	self.stop = true
+	return self
+}
+
+func (self *BoxEvent) Mailbox() *box.Box { return self.mailbox }
+
+func (self *BoxEvent) Stopped() bool { return self.stop }
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
@@ -138,7 +149,7 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	}).Wait()
 	if err != nil {
 		l.Warn("cannot select mailbox, skipped!", slog.Any("error", err))
-		self.boxEvent <- &BoxEvent{Mailbox: self.box, Skipped: true}
+		self.stop()
 		return
 	}
 
@@ -185,7 +196,13 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 		if err != nil {
 			l.Info("watching stopped because of an error",
 				slog.Any("error", err))
-			self.boxEvent <- &BoxEvent{Mailbox: self.box}
+			self.reconnect()
 		}
 	}
 }
+
+func (self *WatchMailBox) stop() {
+	self.boxEvent <- NewBoxEvent(self.box).Stop()
+}
+
+func (self *WatchMailBox) reconnect() { self.boxEvent <- NewBoxEvent(self.box) }
