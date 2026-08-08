@@ -136,22 +136,25 @@ func New(conf *config.NotifyConfig, retries int, opts ...option,
 	}
 
 	var saslClient sasl.Client
-	if caps := c.Caps(); caps != nil && caps.Has(goimap.AuthCap(sasl.OAuthBearer)) {
-		opts := sasl.OAuthBearerOptions{
+	caps := c.Caps()
+	hasBearerAuth := caps != nil && caps.Has(goimap.AuthCap(sasl.OAuthBearer))
+
+	if hasBearerAuth {
+		saslClient = sasl.NewOAuthBearerClient(&sasl.OAuthBearerOptions{
 			Username: conf.Username,
 			// Use something like https://github.com/google/oauth2l in your
 			// passwordCmd to grab the token as a password
 			Token: conf.Password,
 			Host:  conf.Host,
 			Port:  conf.Port,
-		}
-		saslClient = sasl.NewOAuthBearerClient(&opts)
+		})
 	} else {
 		saslClient = NewXoauth2Client(conf.Username, conf.Password)
 	}
 
 	if err := c.Authenticate(saslClient); err != nil {
-		return nil, fmt.Errorf("XOAuth2 authentication: %w", err)
+		return nil, fmt.Errorf(
+			"%w: SASL authentication: %w", ErrLoginFailed, err)
 	}
 	return c, nil
 }
