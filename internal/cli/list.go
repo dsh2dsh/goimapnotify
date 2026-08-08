@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
@@ -24,67 +23,23 @@ var listCmd = cobra.Command{
 
 func listMailboxes(topConfig *config.Configuration) error {
 	for _, account := range topConfig.Configurations {
-		client, err := imap.New(account, flagRetries)
-		if err != nil {
-			return fmt.Errorf(
-				"something went wrong creating IMAP client, account=%s: %w",
-				account.Alias, err,
-			)
-		}
-		defer client.Close()
-
-		mailboxCount, err := printDelimiter(client)
-		if err != nil {
-			return fmt.Errorf(
-				"listing mailboxes finished with error, account=%s: %w",
-				account.Alias, err,
-			)
-		}
-
-		slog.Info("walking through the account mailboxes",
-			slog.String("account", account.Alias),
-			slog.Int("count", mailboxCount))
-
-		err = printMailbox(client, mailboxCount)
-		if err != nil {
-			return fmt.Errorf(
-				"something went wrong while walking on the account listing all mailboxes, account=%s: %w",
-				account.Alias, err,
-			)
-		}
-	}
-	return nil
-}
-
-// printDelimiter prints the hierarchy delimiter and returns mailbox count
-func printDelimiter(c *imapclient.Client) (int, error) {
-	var count int
-	var delimiter string
-
-	for m, err := range imap.Mailboxes(c) {
-		if err != nil {
-			return 0, err
-		}
-		if count == 0 {
-			delimiter = string(m.Delim)
-		}
-		count++
-	}
-
-	fmt.Println("Hierarchy delimiter is:", delimiter)
-	return count, nil
-}
-
-// printMailbox recursively lists mailboxes with tree visualization
-func printMailbox(c *imapclient.Client, mailboxCount int) error {
-	var pos int
-	for m, err := range imap.Mailboxes(c) {
+		boxes, err := imap.List(account, flagRetries)
 		if err != nil {
 			return err
 		}
-		box := boxchar(pos, 0, mailboxCount-1)
-		fmt.Println(box, m.Mailbox)
-		pos++
+
+		count := len(boxes.Boxes)
+		slog.Info("walking through the account mailboxes",
+			slog.String("account", account.Alias),
+			slog.Int("count", count))
+		fmt.Println("Hierarchy delimiter is:", string(boxes.Delim))
+
+		var pos int
+		for _, name := range boxes.Boxes {
+			box := boxchar(pos, 0, count-1)
+			fmt.Println(box, name)
+			pos++
+		}
 	}
 	return nil
 }
