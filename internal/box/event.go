@@ -15,20 +15,22 @@ const (
 	EventDeletedMail
 	EventFlagChanged
 	EventNewMail
+	idleEvents
 
-	maxEvents
+	StopWatching
+	RestartWatching
 )
 
 func (self EventType) String() string {
 	switch self {
-	case EventNewMail:
-		return "New Email"
+	case EventSync:
+		return "Synchronize mailboxes without post-steps"
 	case EventDeletedMail:
 		return "Deleted Email"
 	case EventFlagChanged:
 		return "Changed Flag on Email"
-	case EventSync:
-		return "Synchronize mailboxes without post-steps"
+	case EventNewMail:
+		return "New Email"
 	default:
 		return "Unknown Event"
 	}
@@ -88,7 +90,7 @@ func (self *IDLE) OnReasonPost() string {
 }
 
 type EventSet struct {
-	events [maxEvents]*IDLE
+	events [idleEvents]*IDLE
 	mu     sync.Mutex
 }
 

@@ -42,44 +42,20 @@ func WithWatcher(w *WatchMailBox) option {
 	}
 }
 
-// BoxEvent helps in communication between the box watch launcher and the box
-// watching goroutines
-type BoxEvent struct {
-	mailbox *box.Box
-	stop    bool
-}
-
-func NewBoxEvent(box *box.Box) *BoxEvent { return &BoxEvent{mailbox: box} }
-
-func (self *BoxEvent) Stop() *BoxEvent {
-	self.stop = true
-	return self
-}
-
-func (self *BoxEvent) Mailbox() *box.Box { return self.mailbox }
-
-func (self *BoxEvent) Stopped() bool { return self.stop }
-
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	client    *imapclient.Client
-	box       *box.Box
-	idleEvent chan<- *box.IDLE
-	boxEvent  chan<- *BoxEvent
+	client *imapclient.Client
+	box    *box.Box
+	events chan<- *box.IDLE
 
 	startupSync bool
 }
 
 // NewWatchBox creates a new instance of WatchMailBox and launches it
-func NewWatchBox(
-	m *box.Box,
-	i chan<- *box.IDLE,
-	b chan<- *BoxEvent,
-) *WatchMailBox {
+func NewWatchBox(m *box.Box, events chan<- *box.IDLE) *WatchMailBox {
 	return &WatchMailBox{
-		box:       m,
-		idleEvent: i,
-		boxEvent:  b,
+		box:    m,
+		events: events,
 	}
 }
 
@@ -101,7 +77,7 @@ func (self *WatchMailBox) expunge(seqNum uint32) {
 }
 
 func (self *WatchMailBox) sendEvent(reason box.EventType) {
-	self.idleEvent <- box.NewEvent(self.box, reason)
+	self.events <- box.NewEvent(self.box, reason)
 }
 
 func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
@@ -149,7 +125,7 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	}).Wait()
 	if err != nil {
 		l.Warn("cannot select mailbox, skipped!", slog.Any("error", err))
-		self.stop()
+		self.sendEvent(box.StopWatching)
 		return
 	}
 
@@ -196,13 +172,7 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 		if err != nil {
 			l.Info("watching stopped because of an error",
 				slog.Any("error", err))
-			self.reconnect()
+			self.sendEvent(box.RestartWatching)
 		}
 	}
 }
-
-func (self *WatchMailBox) stop() {
-	self.boxEvent <- NewBoxEvent(self.box).Stop()
-}
-
-func (self *WatchMailBox) reconnect() { self.boxEvent <- NewBoxEvent(self.box) }
