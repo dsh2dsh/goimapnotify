@@ -29,7 +29,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/spf13/cobra"
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
@@ -38,8 +37,6 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
-
-const maxBackoff = 5 * time.Minute
 
 var (
 	commit, gittag, branch string
@@ -189,7 +186,7 @@ func Run() error {
 
 accountLoop:
 	for _, account := range boxes {
-		var connected bool
+		once := new(sync.Once)
 		for _, mailbox := range account.Boxes {
 			if ctx.Err() != nil {
 				break accountLoop
@@ -197,34 +194,17 @@ accountLoop:
 
 			wb := imap.NewWatchBox(mailbox, events).
 				WithStartupSync(topConfig.StartupSync)
-			client, err := imap.New(mailbox.Account(), flagRetries,
-				imap.WithWatcher(wb))
-			if errors.Is(err, imap.ErrLoginFailed) {
+
+			err := wb.Connect(ctx, flagRetries, once)
+			if err != nil {
 				slog.Error("Initial connection failed, skip all account mailboxes",
 					slog.String("account", account.Alias), slog.Any("error", err))
+				wb.Close()
 				continue accountLoop
-			} else if err != nil {
-				slog.Error("Initial connection failed, retrying in background",
-					slog.String("account", account.Alias), slog.Any("error", err))
-				wg.Go(func() {
-					reconnectWatcher(ctx, mailbox, events, flagRetries,
-						topConfig.StartupSync)
-				})
-				watching++
-				continue
 			}
 
-			if !connected {
-				printConnected(slog.With(slog.String("account", account.Alias)),
-					client)
-				connected = true
-			}
-
-			wg.Go(func() {
-				wb.Watch(ctx, client)
-				_ = client.Close()
-			})
 			watching++
+			wg.Go(wb.Watch)
 		}
 	}
 
@@ -248,19 +228,10 @@ idleLoop:
 			case box.StopWatching:
 				watching--
 				if watching == 0 {
-					stop()
 					slog.Error("nothing left to watch, exiting")
+					stop()
 					break idleLoop
 				}
-			case box.RestartWatching:
-				mailbox := e.Box()
-				slog.Info("Restarting watcher for mailbox",
-					slog.String("alias", mailbox.Alias()),
-					slog.String("mailbox", mailbox.Mailbox))
-				wg.Go(func() {
-					reconnectWatcher(ctx, mailbox, events, flagRetries,
-						topConfig.StartupSync)
-				})
 			default:
 				if !e.Skip() {
 					running.Schedule(ctx, e)
@@ -337,54 +308,6 @@ mailboxLoop:
 		boxes = append(boxes, &config.Box{Mailbox: mailbox.Mailbox})
 	}
 	return boxes, nil
-}
-
-func reconnectWatcher(
-	ctx context.Context,
-	mailbox *box.Box,
-	idleChan chan<- *box.IDLE,
-	retries int,
-	startupSync bool,
-) {
-	l := slog.With(
-		slog.String("alias", mailbox.Alias()),
-		slog.String("mailbox", mailbox.Mailbox))
-	backoff := time.Second
-
-	for {
-		select {
-		case <-time.After(backoff):
-		case <-ctx.Done():
-			l.Info("Reconnection cancelled, shutting down")
-			return
-		}
-
-		wb := imap.NewWatchBox(mailbox, idleChan).WithStartupSync(startupSync)
-		client, err := imap.New(mailbox.Account(), retries, imap.WithWatcher(wb))
-		if errors.Is(err, imap.ErrLoginFailed) {
-			l.Error("Reconnection failed", slog.Any("error", err))
-			idleChan <- box.NewEvent(mailbox, box.StopWatching)
-			return
-		} else if err != nil {
-			backoff = min(backoff*2, maxBackoff)
-			l.Error("Reconnection failed",
-				slog.Duration("retrying", backoff),
-				slog.Any("error", err))
-			continue
-		}
-
-		l.Info("Reconnected successfully")
-		wb.Watch(ctx, client)
-		_ = client.Close()
-		return
-	}
-}
-
-func printConnected(l *slog.Logger, c *imapclient.Client) {
-	if caps := imap.AllCaps(c); len(caps) != 0 {
-		l = l.With(slog.Any("capabilities", caps))
-	}
-	l.Info("connected")
 }
 
 func gracefulWait(wg *sync.WaitGroup) {

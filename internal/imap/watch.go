@@ -18,8 +18,10 @@ package imap
 
 import (
 	"context"
+	"errors"
 	"log/slog"
-	"os"
+	"sync"
+	"time"
 
 	goimap "github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
@@ -27,28 +29,19 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/box"
 )
 
-func WithWatcher(w *WatchMailBox) option {
-	return func(o *imapclient.Options) {
-		if o.UnilateralDataHandler != nil {
-			o.UnilateralDataHandler.Expunge = w.expunge
-			o.UnilateralDataHandler.Mailbox = w.mailbox
-			return
-		}
-
-		o.UnilateralDataHandler = &imapclient.UnilateralDataHandler{
-			Expunge: w.expunge,
-			Mailbox: w.mailbox,
-		}
-	}
-}
+const maxBackoff = 5 * time.Minute
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	client *imapclient.Client
-	box    *box.Box
-	events chan<- *box.IDLE
-
+	box         *box.Box
+	events      chan<- *box.IDLE
 	startupSync bool
+
+	ctx     context.Context
+	retries int
+	once    *sync.Once
+
+	client *imapclient.Client
 }
 
 // NewWatchBox creates a new instance of WatchMailBox and launches it
@@ -64,6 +57,37 @@ func (self *WatchMailBox) WithStartupSync(v bool) *WatchMailBox {
 	return self
 }
 
+func (self *WatchMailBox) Connect(ctx context.Context, retries int,
+	once *sync.Once,
+) error {
+	self.ctx = ctx
+	self.retries = retries
+	self.once = once
+
+	account := self.box.Account()
+
+	c, err := New(account, self.retries, self.unilateralDataHandler)
+	if errors.Is(err, ErrLoginFailed) {
+		self.client = c
+		return err
+	} else if err != nil {
+		slog.Error("Initial connection failed, retrying in background",
+			slog.String("account", account.Alias), slog.Any("error", err))
+		return nil
+	}
+
+	self.client = c
+	self.once.Do(self.printConnected)
+	return nil
+}
+
+func (self *WatchMailBox) unilateralDataHandler(o *imapclient.Options) {
+	o.UnilateralDataHandler = &imapclient.UnilateralDataHandler{
+		Expunge: self.expunge,
+		Mailbox: self.mailbox,
+	}
+}
+
 func (self *WatchMailBox) expunge(seqNum uint32) {
 	self.box.ExistingEmail = max(0, self.box.ExistingEmail-1)
 	slog.Info("IDLE expunge",
@@ -77,7 +101,10 @@ func (self *WatchMailBox) expunge(seqNum uint32) {
 }
 
 func (self *WatchMailBox) sendEvent(reason box.EventType) {
-	self.events <- box.NewEvent(self.box, reason)
+	select {
+	case <-self.ctx.Done():
+	case self.events <- box.NewEvent(self.box, reason):
+	}
 }
 
 func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
@@ -113,9 +140,69 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 	l.Info("IDLE mailbox")
 }
 
-// Watch starts watching the mailbox for IDLE events
-func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
-	self.client = c
+func (self *WatchMailBox) printConnected() {
+	l := slog.With(slog.String("account", self.box.Alias()))
+	if caps := AllCaps(self.client); len(caps) != 0 {
+		l = l.With(slog.Any("capabilities", caps))
+	}
+	l.Info("connected")
+}
+
+func (self *WatchMailBox) Watch() {
+	defer self.Close()
+	for self.reconnect() {
+		if self.ctx.Err() != nil {
+			return
+		} else if !self.watch() {
+			break
+		}
+		self.Close()
+	}
+
+	if self.ctx.Err() == nil {
+		self.sendEvent(box.StopWatching)
+	}
+}
+
+func (self *WatchMailBox) reconnect() bool {
+	if self.client != nil {
+		return true
+	}
+
+	l := slog.With(
+		slog.String("alias", self.box.Alias()),
+		slog.String("mailbox", self.box.Mailbox))
+	backoff := time.Second
+
+	for {
+		select {
+		case <-time.After(backoff):
+		case <-self.ctx.Done():
+			l.Info("Reconnection cancelled, shutting down")
+			return false
+		}
+
+		c, err := New(self.box.Account(), self.retries, self.unilateralDataHandler)
+		if errors.Is(err, ErrLoginFailed) {
+			l.Error("Reconnection failed", slog.Any("error", err))
+			self.client = c
+			return false
+		} else if err != nil {
+			backoff = min(backoff*2, maxBackoff)
+			l.Error("Reconnection failed",
+				slog.Duration("retrying", backoff),
+				slog.Any("error", err))
+			continue
+		}
+
+		l.Info("Reconnected successfully")
+		self.client = c
+		self.once.Do(self.printConnected)
+		return true
+	}
+}
+
+func (self *WatchMailBox) watch() bool {
 	l := slog.With(
 		slog.String("alias", self.box.Alias()),
 		slog.String("mailbox", self.box.Mailbox))
@@ -125,8 +212,7 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	}).Wait()
 	if err != nil {
 		l.Warn("cannot select mailbox, skipped!", slog.Any("error", err))
-		self.sendEvent(box.StopWatching)
-		return
+		return false
 	}
 
 	self.box.ExistingEmail = status.NumMessages
@@ -134,10 +220,10 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 		slog.Uint64("messages", uint64(self.box.ExistingEmail)))
 
 	// Start idling
-	idleCmd, err := c.Idle()
+	idleCmd, err := self.client.Idle()
 	if err != nil {
 		l.Error("IDLE command failed", slog.Any("error", err))
-		os.Exit(1)
+		return true
 	}
 	defer idleCmd.Close()
 
@@ -155,24 +241,42 @@ func (self *WatchMailBox) Watch(ctx context.Context, c *imapclient.Client) {
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-self.ctx.Done():
 		// the main event loop is asking us to stop
 		l.Info("stopping client watching mailbox")
 		if err := idleCmd.Close(); err != nil {
-			l.Error("failed to stop idling", slog.Any("error", err))
-			return
+			l.Error("stop idling finished with error", slog.Any("error", err))
+			return false
 		}
 
 		if err := <-done; err != nil {
 			l.Error("IDLE command failed", slog.Any("error", err))
 		}
+		return false
 
 	case err := <-done:
-		l.Info("done watching mailbox")
 		if err != nil {
 			l.Info("watching stopped because of an error",
 				slog.Any("error", err))
-			self.sendEvent(box.RestartWatching)
+			break
 		}
+		l.Info("done watching mailbox")
+	}
+	return true
+}
+
+func (self *WatchMailBox) Close() {
+	if self.client == nil {
+		return
+	}
+
+	c := self.client
+	self.client = nil
+
+	if err := c.Close(); err != nil {
+		slog.Error("closing connection finished with error",
+			slog.String("account", self.box.Alias()),
+			slog.String("mailbox", self.box.Mailbox),
+			slog.Any("error", err))
 	}
 }

@@ -18,7 +18,6 @@ const (
 	idleEvents
 
 	StopWatching
-	RestartWatching
 )
 
 func (self EventType) String() string {
