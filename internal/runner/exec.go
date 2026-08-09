@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func execCommand(cmd *exec.Cmd, command string) error {
+func execCommand(cmd *exec.Cmd, command string) ([]byte, error) {
 	slog.Info(command)
 
 	startedAt := time.Now()
@@ -28,13 +28,12 @@ func execCommand(cmd *exec.Cmd, command string) error {
 
 		l.Error("command failed", slog.Duration("elapsed", elapsed))
 		printCommandOutput(slog.LevelError, "stderr: ", stderr)
-		return fmt.Errorf("command failed: %w", err)
+		return nil, fmt.Errorf("command failed: %w", err)
 	}
 
 	slog.Info("command exited ok",
 		slog.Duration("elapsed", time.Since(startedAt)))
-	printCommandOutput(slog.LevelInfo, "stdout: ", stdout)
-	return nil
+	return stdout, nil
 }
 
 func printCommandOutput(level slog.Level, prefix string, b []byte) {

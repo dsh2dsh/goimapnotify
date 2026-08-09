@@ -49,6 +49,28 @@ testing.
 
   Here we changed it from default 5 minutes to 10 minutes.
 
+* Desktop notifications
+
+  Output of executed commands can be sent as desktop notifications. It can be
+  configured by top level option:
+
+  ```yaml
+  desktopNotify:
+    enable: true
+    appName: "goimapnotify"
+    appIcon: "mail-unread"
+    category: "email.arrived"
+    desktopEntry: "firefox"
+  ```
+
+  Every option is optinal and `appName` is `goimapnotify` by default, if
+  enabled. `desktopEntry` defines a `.desktop` file, associated with
+  notification. Notification will have an icon defined in that file and will be
+  stored in notification history. Without `desktopEntry` it will not be stored
+  in notification history after disappearing.
+
+  Test notification can be sent using `goimapotify test-notify`.
+
 ## Configuration
 
 This application is mostly compatible with the configuration of
@@ -184,6 +206,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
   list        List all mailboxes and exit
+  test-notify Show test desktop notification
 
 Flags:
   -c, --conf string               Configuration file (default "/home/dsh/.config/goimapnotify/goimapnotify.yaml")

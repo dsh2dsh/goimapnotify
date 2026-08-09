@@ -1,10 +1,13 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/esiqveland/notify"
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/command"
@@ -14,13 +17,16 @@ type handler struct {
 	box     *box.Box
 	wait    time.Duration
 	maxWait time.Duration
-	t       *time.Timer
 
 	events box.EventSet
+	t      *time.Timer
 
 	mu      sync.Mutex
 	delayed time.Duration
 	nextRun time.Time
+
+	notifier     notify.Notifier
+	notification notify.Notification
 }
 
 func NewHandler(b *box.Box, wait time.Duration) *handler {
@@ -29,6 +35,14 @@ func NewHandler(b *box.Box, wait time.Duration) *handler {
 
 func (self *handler) WithMaxDelay(v time.Duration) *handler {
 	self.maxWait = v
+	return self
+}
+
+func (self *handler) WithNotifier(n notify.Notifier,
+	notification notify.Notification,
+) *handler {
+	self.notifier = n
+	self.notification = notification
 	return self
 }
 
@@ -104,11 +118,38 @@ func (self *handler) processEvents(ctx context.Context) error {
 		}
 
 		cmd := command.NewContext(ctx, s)
-		if err := execCommand(cmd, s); err != nil {
+		output, err := execCommand(cmd, s)
+		if err != nil {
 			return err
 		}
+		self.notify(output)
 	}
 	return nil
+}
+
+func (self *handler) notify(output []byte) {
+	if len(output) == 0 {
+		return
+	}
+
+	if self.notifier == nil {
+		printCommandOutput(slog.LevelInfo, "stdout: ", output)
+		return
+	}
+
+	n := self.notification
+	if before, after, found := bytes.Cut(output, []byte("\n")); found {
+		n.Summary = string(bytes.TrimSpace(before))
+		n.Body = string(bytes.TrimSpace(after))
+	} else {
+		n.Body = string(bytes.TrimSpace(before))
+	}
+
+	_, err := self.notifier.SendNotification(n)
+	if err != nil {
+		printCommandOutput(slog.LevelInfo, "stdout: ", output)
+		slog.Error("unable send desktop notification", slog.Any("error", err))
+	}
 }
 
 func (self *handler) reset() {

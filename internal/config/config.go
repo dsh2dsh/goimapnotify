@@ -20,9 +20,18 @@ import "time"
 
 // Configuration holds the top-level configuration
 type Configuration struct {
-	MaxDelay       time.Duration   `yaml:"maxDelay" validate:"gt=0"`
-	StartupSync    bool            `yaml:"startupSync"`
-	Configurations []*NotifyConfig `yaml:"configurations" validate:"gt=0,dive,required"`
+	MaxDelay       time.Duration       `yaml:"maxDelay" validate:"gt=0"`
+	StartupSync    bool                `yaml:"startupSync"`
+	DesktopNotify  DesktopNotification `yaml:"desktopNotify"`
+	Configurations []*NotifyConfig     `yaml:"configurations" validate:"gt=0,dive,required"`
+}
+
+type DesktopNotification struct {
+	Enable       bool   `yaml:"enable"`
+	AppName      string `yaml:"appName"`
+	AppIcon      string `yaml:"appIcon"`
+	Category     string `yaml:"category"`
+	DesktopEntry string `yaml:"desktopEntry"`
 }
 
 // ConfigurationLegacy holds the old configuration format

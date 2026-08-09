@@ -82,6 +82,7 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagList, "list", false, "List all mailboxes and exit")
 	Cmd.AddCommand(&listCmd)
+	Cmd.AddCommand(&notifyCmd)
 }
 
 func Execute() {
@@ -180,6 +181,16 @@ func Run() error {
 		syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	running := runner.New(n, time.Duration(flagWait)).
+		WithMaxDelay(topConfig.MaxDelay)
+	defer running.Close()
+	if topConfig.DesktopNotify.Enable {
+		err := running.EnableDesktopNotifications(ctx, topConfig.DesktopNotify)
+		if err != nil {
+			return fmt.Errorf("trying to enable desktop notifications: %w", err)
+		}
+	}
+
 	events := make(chan *box.IDLE)
 	var wg sync.WaitGroup
 	var watching int
@@ -213,9 +224,6 @@ accountLoop:
 		return errors.New("nothing left to watch")
 	}
 
-	running := runner.New(n, time.Duration(flagWait)).
-		WithMaxDelay(topConfig.MaxDelay)
-
 idleLoop:
 	for {
 		select {
@@ -241,7 +249,7 @@ idleLoop:
 	}
 
 	slog.Info("waiting other goroutines to stop...")
-	gracefulWait(&wg)
+	gracefulWait(&wg, running)
 	slog.Info("bye")
 
 	if watching == 0 {
@@ -310,10 +318,11 @@ mailboxLoop:
 	return boxes, nil
 }
 
-func gracefulWait(wg *sync.WaitGroup) {
+func gracefulWait(wg *sync.WaitGroup, running *runner.Runner) {
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
+		running.Wait()
 		close(done)
 	}()
 
