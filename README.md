@@ -63,11 +63,30 @@ testing.
     desktopEntry: "firefox"
   ```
 
-  Every option is optinal and `appName` is `goimapnotify` by default, if
+  Every option is optional and `appName` is `goimapnotify` by default, if
   enabled. `desktopEntry` defines a `.desktop` file, associated with
   notification. Notification will have an icon defined in that file and will be
   stored in notification history. Without `desktopEntry` it will not be stored
   in notification history after disappearing.
+
+  Any mailbox can add actions to its notifications for executing commands.
+  Example:
+
+  ```yaml
+  configurations:
+    - host: "imap.fastmail.com"
+      boxes:
+        - mailbox: "INBOX"
+        notificationActions:
+          - key: "default"
+            label: "View"
+            exec: [ "xdg-open", "https://app.fastmail.com/mail/Inbox/" ]
+  ```
+
+  With this configuration it runs `xdg-open` on click, because `default` is a
+  magic key for defining on click actions. Anything else can be used as value of
+  `key` and it must be uniq. As an example one possible rendering of actions
+  would be as buttons in the notification popup.
 
   Test notification can be sent using `goimapotify test-notify`.
 

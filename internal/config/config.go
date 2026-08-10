@@ -78,7 +78,7 @@ type NotifyConfig struct {
 	OnChangedMailPost string           `yaml:"onChangedMailPost" json:"onChangedMailPost"`
 	OnDeletedMail     string           `yaml:"onDeletedMail"     json:"onDeletedMail"`
 	OnDeletedMailPost string           `yaml:"onDeletedMailPost" json:"onDeletedMailPost"`
-	Boxes             []*Box           `yaml:"boxes"             json:"boxes"`
+	Boxes             []*Box           `yaml:"boxes"             json:"boxes" validate:"dive"`
 }
 
 // TLSOptionsStruct holds TLS configuration options
@@ -91,11 +91,19 @@ type TLSOptionsStruct struct {
 // IDLEEvent handler routine, in order to schedule commands and
 // print informative messages
 type Box struct {
-	Mailbox           string `json:"mailbox"           yaml:"mailbox"`
+	Mailbox           string `json:"mailbox"           yaml:"mailbox" validate:"required"`
 	OnNewMail         string `json:"onNewMail"         yaml:"onNewMail"`
 	OnNewMailPost     string `json:"onNewMailPost"     yaml:"onNewMailPost"`
 	OnChangedMail     string `json:"onChangedMail"     yaml:"onChangedMail"`
 	OnChangedMailPost string `json:"onChangedMailPost" yaml:"onChangedMailPost"`
 	OnDeletedMail     string `json:"onDeletedMail"     yaml:"onDeletedMail"`
 	OnDeletedMailPost string `json:"onDeletedMailPost" yaml:"onDeletedMailPost"`
+
+	NotificationActions []*NotificationAction `yaml:"notificationActions" validate:"dive"`
+}
+
+type NotificationAction struct {
+	Key   string   `yaml:"key"   validate:"required"`
+	Label string   `yaml:"label" validate:"required"`
+	Exec  []string `yaml:"exec"  validate:"min=1,dive,required"`
 }

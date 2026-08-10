@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/command"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 type handler struct {
@@ -25,8 +28,9 @@ type handler struct {
 	delayed time.Duration
 	nextRun time.Time
 
-	notifier     notify.Notifier
-	notification notify.Notification
+	notifier      *notifier
+	notifyActions []notify.Action
+	boxActions    map[string]*config.NotificationAction
 }
 
 func NewHandler(b *box.Box, wait time.Duration) *handler {
@@ -38,11 +42,20 @@ func (self *handler) WithMaxDelay(v time.Duration) *handler {
 	return self
 }
 
-func (self *handler) WithNotifier(n notify.Notifier,
-	notification notify.Notification,
-) *handler {
+func (self *handler) WithNotifier(n *notifier) *handler {
 	self.notifier = n
-	self.notification = notification
+
+	boxActions := self.box.NotificationActions
+	if len(boxActions) == 0 {
+		return self
+	}
+
+	self.boxActions = make(map[string]*config.NotificationAction, len(boxActions))
+	self.notifyActions = make([]notify.Action, len(boxActions))
+	for i, act := range boxActions {
+		self.boxActions[act.Key] = act
+		self.notifyActions[i] = notify.Action{Key: act.Key, Label: act.Label}
+	}
 	return self
 }
 
@@ -137,7 +150,8 @@ func (self *handler) notify(output []byte) {
 		return
 	}
 
-	n := self.notification
+	n := notify.Notification{Actions: self.notifyActions}
+
 	before, after, found := bytes.Cut(output, []byte("\n"))
 	if found {
 		switch body := string(bytes.TrimSpace(after)); body {
@@ -151,8 +165,7 @@ func (self *handler) notify(output []byte) {
 		n.Body = string(bytes.TrimSpace(before))
 	}
 
-	_, err := self.notifier.SendNotification(n)
-	if err != nil {
+	if err := self.notifier.Send(n, self); err != nil {
 		printCommandOutput(slog.LevelInfo, "stdout: ", output)
 		slog.Error("unable send desktop notification", slog.Any("error", err))
 	}
@@ -189,4 +202,28 @@ func (self *handler) completed() {
 		slog.Duration("was", d),
 		slog.Duration("wait", self.wait),
 		slog.Time("when", self.nextRun))
+}
+
+func (self *handler) OnAction(ctx context.Context, actionKey string) {
+	act := self.boxActions[actionKey]
+	if act == nil {
+		slog.Warn("desktop notification action not configured",
+			slog.String("actionKey", actionKey),
+			slog.String("alias", self.box.Alias()),
+			slog.String("mailbox", self.box.Mailbox))
+		return
+	}
+
+	slog.Info("running desktop notification action",
+		slog.String("actionKey", actionKey),
+		slog.String("alias", self.box.Alias()),
+		slog.String("mailbox", self.box.Mailbox))
+
+	cmd := exec.CommandContext(ctx, act.Exec[0], act.Exec[1:]...)
+	output, err := execCommand(cmd, strings.Join(act.Exec, " "))
+	if err != nil {
+		slog.Error("desktop notification action failed", slog.Any("error", err))
+		return
+	}
+	printCommandOutput(slog.LevelInfo, "stdout: ", output)
 }

@@ -18,27 +18,20 @@ package runner
 
 import (
 	"context"
-	"errors"
-	"log/slog"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/esiqveland/notify"
-	"github.com/godbus/dbus/v5"
-
 	"github.com/dsh2dsh/goimapnotify/internal/box"
+	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
 type Runner struct {
 	wait     time.Duration
 	maxWait  time.Duration
 	handlers map[*box.Box]*handler
-
-	dbus         *dbus.Conn
-	notifier     notify.Notifier
-	notification notify.Notification
-
-	wg sync.WaitGroup
+	notifier *notifier
+	wg       sync.WaitGroup
 }
 
 func New(n int, wait time.Duration) *Runner {
@@ -53,6 +46,16 @@ func (self *Runner) WithMaxDelay(v time.Duration) *Runner {
 	return self
 }
 
+func (self *Runner) EnableDesktopNotifications(ctx context.Context,
+	cfg config.DesktopNotification, n int,
+) error {
+	self.notifier = NewNotifier(n)
+	if err := self.notifier.Connect(ctx, cfg); err != nil {
+		return fmt.Errorf("create desktop notifier: %w", err)
+	}
+	return nil
+}
+
 func (self *Runner) Schedule(ctx context.Context, e *box.IDLE) {
 	if h, ok := self.handlers[e.Box()]; ok {
 		h.Schedule(e)
@@ -61,7 +64,7 @@ func (self *Runner) Schedule(ctx context.Context, e *box.IDLE) {
 
 	h := NewHandler(e.Box(), self.wait).WithMaxDelay(self.maxWait)
 	if self.notifier != nil {
-		h.WithNotifier(self.notifier, self.notification)
+		h.WithNotifier(self.notifier)
 	}
 	self.handlers[e.Box()] = h
 
@@ -73,15 +76,6 @@ func (self *Runner) Wait() { self.wg.Wait() }
 
 func (self *Runner) Close() {
 	if self.notifier != nil {
-		err := self.notifier.Close()
-		if err != nil && !errors.Is(err, dbus.ErrClosed) {
-			slog.Error("failed close desktop notifier", slog.Any("error", err))
-		}
-	}
-
-	if self.dbus != nil {
-		if err := self.dbus.Close(); err != nil {
-			slog.Error("failed close dbus", slog.Any("error", err))
-		}
+		self.notifier.Close()
 	}
 }

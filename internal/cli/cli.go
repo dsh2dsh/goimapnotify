@@ -185,7 +185,7 @@ func Run() error {
 		WithMaxDelay(topConfig.MaxDelay)
 	defer running.Close()
 	if topConfig.DesktopNotify.Enable {
-		err := running.EnableDesktopNotifications(ctx, topConfig.DesktopNotify)
+		err := running.EnableDesktopNotifications(ctx, topConfig.DesktopNotify, n)
 		if err != nil {
 			return fmt.Errorf("trying to enable desktop notifications: %w", err)
 		}
