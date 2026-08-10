@@ -28,7 +28,7 @@ type Configuration struct {
 
 type DesktopNotification struct {
 	Enable       bool   `yaml:"enable"`
-	AppName      string `yaml:"appName"`
+	AppName      string `yaml:"appName" validate:"required_with=Enable"`
 	AppIcon      string `yaml:"appIcon"`
 	Category     string `yaml:"category"`
 	DesktopEntry string `yaml:"desktopEntry"`
