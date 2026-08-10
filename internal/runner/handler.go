@@ -138,9 +138,15 @@ func (self *handler) notify(output []byte) {
 	}
 
 	n := self.notification
-	if before, after, found := bytes.Cut(output, []byte("\n")); found {
-		n.Summary = string(bytes.TrimSpace(before))
-		n.Body = string(bytes.TrimSpace(after))
+	before, after, found := bytes.Cut(output, []byte("\n"))
+	if found {
+		switch body := string(bytes.TrimSpace(after)); body {
+		case "":
+			n.Body = string(bytes.TrimSpace(before))
+		default:
+			n.Summary = string(bytes.TrimSpace(before))
+			n.Body = body
+		}
 	} else {
 		n.Body = string(bytes.TrimSpace(before))
 	}
