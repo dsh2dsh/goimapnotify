@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/esiqveland/notify"
 	"github.com/godbus/dbus/v5"
@@ -17,9 +18,10 @@ import (
 type notifier struct {
 	ctx context.Context
 
-	dbus         *dbus.Conn
-	notifier     notify.Notifier
-	notification notify.Notification
+	dbus          *dbus.Conn
+	notifier      notify.Notifier
+	notification  notify.Notification
+	actionTimeout time.Duration
 
 	mu       sync.Mutex
 	handlers map[uint32]*handler
@@ -52,6 +54,7 @@ func (self *notifier) Connect(ctx context.Context,
 	self.notifier = n
 
 	self.notification = DesktopNotificationFrom(cfg)
+	self.actionTimeout = cfg.ActionTimeout
 	return nil
 }
 
@@ -94,7 +97,7 @@ func (self *notifier) notificationAction(sig *notify.ActionInvokedSignal) {
 
 	self.running.Add(1)
 	self.wg.Go(func() {
-		h.OnAction(self.ctx, sig.ActionKey)
+		h.OnAction(self.ctx, sig.ActionKey, self.actionTimeout)
 		self.running.Add(-1)
 	})
 }

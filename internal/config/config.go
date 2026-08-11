@@ -27,11 +27,12 @@ type Configuration struct {
 }
 
 type DesktopNotification struct {
-	Enable       bool   `yaml:"enable"`
-	AppName      string `yaml:"appName" validate:"required_with=Enable"`
-	AppIcon      string `yaml:"appIcon"`
-	Category     string `yaml:"category"`
-	DesktopEntry string `yaml:"desktopEntry"`
+	Enable        bool          `yaml:"enable"`
+	AppName       string        `yaml:"appName" validate:"required_with=Enable"`
+	AppIcon       string        `yaml:"appIcon"`
+	Category      string        `yaml:"category"`
+	DesktopEntry  string        `yaml:"desktopEntry"`
+	ActionTimeout time.Duration `yaml:"actionTimeout" validate:"min=0"`
 }
 
 // ConfigurationLegacy holds the old configuration format

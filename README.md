@@ -57,17 +57,21 @@ testing.
   ```yaml
   desktopNotify:
     enable: true
-    appName: "goimapnotify"
+    appName: "goimapnotify" # default: goimapnotify
     appIcon: "mail-unread"
     category: "email.arrived"
     desktopEntry: "firefox"
+    actionTimeout: "10s"    # default: 10s
   ```
 
-  Every option is optional and `appName` is `goimapnotify` by default, if
-  enabled. `desktopEntry` defines a `.desktop` file, associated with
-  notification. Notification will have an icon defined in that file and will be
-  stored in notification history. Without `desktopEntry` it will not be stored
-  in notification history after disappearing.
+  Every option is optional.
+
+  `desktopEntry` defines a `.desktop` file, associated with notification.
+  Notification will have an icon defined in that file and will be stored in
+  notification history. Without `desktopEntry` it will not be stored in
+  notification history after disappearing.
+
+  `actionTimeout` defines how long to wait before kill action's command.
 
   Any mailbox can add actions to its notifications for executing commands.
   Example:

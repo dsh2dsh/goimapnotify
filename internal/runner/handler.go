@@ -209,7 +209,9 @@ func (self *handler) completed() {
 		slog.Time("when", self.nextRun))
 }
 
-func (self *handler) OnAction(ctx context.Context, actionKey string) {
+func (self *handler) OnAction(ctx context.Context, actionKey string,
+	timeout time.Duration,
+) {
 	act := self.boxActions[actionKey]
 	if act == nil {
 		slog.Warn("desktop notification action not configured",
@@ -222,7 +224,14 @@ func (self *handler) OnAction(ctx context.Context, actionKey string) {
 	slog.Info("run desktop notification action",
 		slog.String("actionKey", actionKey),
 		slog.String("alias", self.box.Alias()),
-		slog.String("mailbox", self.box.Mailbox))
+		slog.String("mailbox", self.box.Mailbox),
+		slog.Duration("timeout", timeout))
+
+	if timeout > 0 {
+		timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+		ctx = timeoutCtx
+		defer cancel()
+	}
 
 	cmd := exec.CommandContext(ctx, act.Exec[0], act.Exec[1:]...)
 	output, err := execCommand(cmd, strings.Join(act.Exec, " "))

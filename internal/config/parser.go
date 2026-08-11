@@ -17,9 +17,12 @@ func LoadYAML(filename string) (*Configuration, error) {
 	}
 
 	cfg := &Configuration{
-		MaxDelay:      5 * time.Minute,
-		StartupSync:   true,
-		DesktopNotify: DesktopNotification{AppName: "goimapnotify"},
+		MaxDelay:    5 * time.Minute,
+		StartupSync: true,
+		DesktopNotify: DesktopNotification{
+			AppName:       "goimapnotify",
+			ActionTimeout: 10 * time.Second,
+		},
 	}
 	if err := yaml.Unmarshal(b, cfg); err != nil {
 		return nil, fmt.Errorf("config: parse yaml %q: %w", filename, err)
