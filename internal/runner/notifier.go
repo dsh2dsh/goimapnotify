@@ -142,7 +142,8 @@ func (self *notifier) Close() {
 	}
 }
 
-func (self *notifier) Send(n notify.Notification, h *handler) error {
+func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
+) error {
 	if self.notifier == nil {
 		return errors.New("not connected to notifier")
 	}
@@ -158,11 +159,18 @@ func (self *notifier) Send(n notify.Notification, h *handler) error {
 	}
 
 	if len(n.Actions) == 0 {
+		l.Info("sent desktop notification without actions",
+			slog.Uint64("id", uint64(id)))
 		return nil
 	}
 
+	var watching int
 	self.mu.Lock()
 	self.handlers[id] = h
+	watching = len(self.handlers)
 	self.mu.Unlock()
+
+	l.Info("sent desktop notification with actions",
+		slog.Uint64("id", uint64(id)), slog.Int("watching", watching))
 	return nil
 }
