@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 
 	"github.com/esiqveland/notify"
 	"github.com/godbus/dbus/v5"
@@ -22,6 +23,9 @@ type notifier struct {
 
 	mu       sync.Mutex
 	handlers map[uint32]*handler
+
+	wg      sync.WaitGroup
+	running atomic.Int64
 }
 
 func NewNotifier(n int) *notifier {
@@ -76,18 +80,23 @@ func DBusConnect(ctx context.Context) (conn *dbus.Conn,
 }
 
 func (self *notifier) notificationAction(sig *notify.ActionInvokedSignal) {
-	slog.Info("got desktop notification action",
+	l := slog.With(
 		slog.Uint64("id", uint64(sig.ID)),
 		slog.String("actionKey", sig.ActionKey))
+	l.Info("got desktop notification action",
+		slog.Int64("running", self.running.Load()))
 
 	h := self.actionHandler(sig.ID)
 	if h == nil {
-		slog.Warn("unknown desktop notification action",
-			slog.Uint64("id", uint64(sig.ID)),
-			slog.String("actionKey", sig.ActionKey))
+		slog.Warn("unknown desktop notification action")
 		return
 	}
-	h.OnAction(self.ctx, sig.ActionKey)
+
+	self.running.Add(1)
+	self.wg.Go(func() {
+		h.OnAction(self.ctx, sig.ActionKey)
+		self.running.Add(-1)
+	})
 }
 
 func (self *notifier) actionHandler(id uint32) *handler {
@@ -128,6 +137,8 @@ func DesktopNotificationFrom(cfg config.DesktopNotification,
 }
 
 func (self *notifier) Close() {
+	self.wg.Wait()
+
 	if self.notifier != nil {
 		err := self.notifier.Close()
 		if err != nil && !errors.Is(err, dbus.ErrClosed) {
@@ -171,6 +182,8 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 	self.mu.Unlock()
 
 	l.Info("sent desktop notification with actions",
-		slog.Uint64("id", uint64(id)), slog.Int("watching", watching))
+		slog.Uint64("id", uint64(id)),
+		slog.Int("watching", watching),
+		slog.Int64("running", self.running.Load()))
 	return nil
 }

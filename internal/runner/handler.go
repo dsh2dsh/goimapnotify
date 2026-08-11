@@ -219,7 +219,7 @@ func (self *handler) OnAction(ctx context.Context, actionKey string) {
 		return
 	}
 
-	slog.Info("running desktop notification action",
+	slog.Info("run desktop notification action",
 		slog.String("actionKey", actionKey),
 		slog.String("alias", self.box.Alias()),
 		slog.String("mailbox", self.box.Mailbox))
