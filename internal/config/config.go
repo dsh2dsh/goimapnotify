@@ -84,8 +84,15 @@ type NotifyConfig struct {
 
 // TLSOptionsStruct holds TLS configuration options
 type TLSOptionsStruct struct {
-	RejectUnauthorized bool `yaml:"rejectUnauthorized" json:"rejectUnauthorized"`
-	STARTTLS           bool `yaml:"starttls"           json:"starttls"`
+	RejectUnauthorized *bool `yaml:"rejectUnauthorized" json:"rejectUnauthorized"`
+	STARTTLS           bool  `yaml:"starttls"           json:"starttls"`
+}
+
+func (self *TLSOptionsStruct) GetRejectUnauthorized() bool {
+	if self.RejectUnauthorized == nil {
+		return true
+	}
+	return *self.RejectUnauthorized
 }
 
 // Box stores all the necessary info needed to be passed in an

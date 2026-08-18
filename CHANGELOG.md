@@ -2,6 +2,12 @@
 ## [Unreleased]
 
 
+<a name="2.5.8"></a>
+## [2.5.8] - 2026-08-18
+### Fixes
+- Address security audit findings
+
+
 <a name="2.5.7"></a>
 ## [2.5.7] - 2026-07-25
 ### Changes
@@ -172,7 +178,8 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.7...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.8...HEAD
+[2.5.8]: https://gitlab.com/shackra/goimapnotify/compare/2.5.7...2.5.8
 [2.5.7]: https://gitlab.com/shackra/goimapnotify/compare/2.5.6...2.5.7
 [2.5.6]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...2.5.6
 [2.5.5]: https://gitlab.com/shackra/goimapnotify/compare/2.5.4...2.5.5

@@ -127,9 +127,9 @@ func TestCensorPasswordInLogin(t *testing.T) {
 			expected: `C: a]$ LOGIN myuser "****"`,
 		},
 		{
-			name:     "lowercase login (not matched)",
+			name:     "lowercase login (matched)",
 			input:    `C: a]$ login user "password"`,
-			expected: `C: a]$ login user "password"`,
+			expected: `C: a]$ login user "****"`,
 		},
 	}
 
@@ -138,6 +138,39 @@ func TestCensorPasswordInLogin(t *testing.T) {
 			result := censorPasswordInLogin(tt.input)
 			if result != tt.expected {
 				t.Errorf("CensorPasswordInLogin(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCensorOAuthToken(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "XOAUTH2 token",
+			input:    "C: a001 AUTHENTICATE XOAUTH2 user=user@example.com\x01auth=Bearer ya29.token123\x01\x01",
+			expected: "C: a001 AUTHENTICATE XOAUTH2 user=user@example.com\x01auth=Bearer ****\x01\x01",
+		},
+		{
+			name:     "OAUTHBEARER token",
+			input:    "n,a=user,\x01host=example.com\x01port=993\x01auth=Bearer token.abc\x01\x01",
+			expected: "n,a=user,\x01host=example.com\x01port=993\x01auth=Bearer ****\x01\x01",
+		},
+		{
+			name:     "no token",
+			input:    "C: a002 SELECT INBOX",
+			expected: "C: a002 SELECT INBOX",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := censorOAuthToken(tt.input)
+			if result != tt.expected {
+				t.Errorf("CensorOAuthToken(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}

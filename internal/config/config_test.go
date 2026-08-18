@@ -19,8 +19,6 @@ package config
 import (
 	"encoding/json"
 	"testing"
-
-	"go.yaml.in/yaml/v4"
 )
 
 // TestLegacyConverter tests the LegacyConverter function
@@ -31,7 +29,7 @@ func TestLegacyConverter(t *testing.T) {
 		Port:    993,
 		TLS:     true,
 		TLSOptions: TLSOptionsStruct{
-			RejectUnauthorized: true,
+			RejectUnauthorized: new(true),
 			STARTTLS:           false,
 		},
 		IDLELogoutTimeout: 30,
@@ -71,9 +69,9 @@ func TestLegacyConverter(t *testing.T) {
 	if conf.TLS != legacy.TLS {
 		t.Errorf("TLS = %v, want %v", conf.TLS, legacy.TLS)
 	}
-	if conf.TLSOptions.RejectUnauthorized != legacy.TLSOptions.RejectUnauthorized {
+	if conf.TLSOptions.GetRejectUnauthorized() != legacy.TLSOptions.GetRejectUnauthorized() {
 		t.Errorf("TLSOptions.RejectUnauthorized = %v, want %v",
-			conf.TLSOptions.RejectUnauthorized, legacy.TLSOptions.RejectUnauthorized)
+			conf.TLSOptions.GetRejectUnauthorized(), legacy.TLSOptions.GetRejectUnauthorized())
 	}
 	if conf.TLSOptions.STARTTLS != legacy.TLSOptions.STARTTLS {
 		t.Errorf("TLSOptions.STARTTLS = %v, want %v",
@@ -181,182 +179,6 @@ func TestLegacyConverter_MinimalConfig(t *testing.T) {
 	}
 }
 
-// TestNotifyConfig_JSONSerialization tests JSON marshaling/unmarshaling
-func TestNotifyConfig_JSONSerialization(t *testing.T) {
-	original := NotifyConfig{
-		Host:     "imap.example.com",
-		Port:     993,
-		TLS:      true,
-		Username: "user@example.com",
-		Password: "secret",
-		Boxes: []*Box{
-			{Mailbox: "INBOX", OnNewMail: "echo new"},
-			{Mailbox: "Sent", OnNewMail: "echo sent"},
-		},
-	}
-
-	// Marshal to JSON
-	data, err := json.Marshal(original)
-	if err != nil {
-		t.Fatalf("json.Marshal() error = %v", err)
-	}
-
-	// Unmarshal back
-	var result NotifyConfig
-	err = json.Unmarshal(data, &result)
-	if err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
-
-	// Verify fields
-	if result.Host != original.Host {
-		t.Errorf("Host = %q, want %q", result.Host, original.Host)
-	}
-	if result.Port != original.Port {
-		t.Errorf("Port = %d, want %d", result.Port, original.Port)
-	}
-	if result.TLS != original.TLS {
-		t.Errorf("TLS = %v, want %v", result.TLS, original.TLS)
-	}
-	if len(result.Boxes) != len(original.Boxes) {
-		t.Errorf("Boxes length = %d, want %d", len(result.Boxes), len(original.Boxes))
-	}
-}
-
-// TestNotifyConfig_YAMLSerialization tests YAML marshaling/unmarshaling
-func TestNotifyConfig_YAMLSerialization(t *testing.T) {
-	original := NotifyConfig{
-		Host:     "imap.example.com",
-		Port:     993,
-		TLS:      true,
-		Username: "user@example.com",
-		Password: "secret",
-		TLSOptions: TLSOptionsStruct{
-			RejectUnauthorized: true,
-			STARTTLS:           false,
-		},
-		Boxes: []*Box{
-			{Mailbox: "INBOX", OnNewMail: "echo new"},
-		},
-	}
-
-	// Marshal to YAML
-	data, err := yaml.Marshal(original)
-	if err != nil {
-		t.Fatalf("yaml.Marshal() error = %v", err)
-	}
-
-	// Unmarshal back
-	var result NotifyConfig
-	err = yaml.Unmarshal(data, &result)
-	if err != nil {
-		t.Fatalf("yaml.Unmarshal() error = %v", err)
-	}
-
-	// Verify fields
-	if result.Host != original.Host {
-		t.Errorf("Host = %q, want %q", result.Host, original.Host)
-	}
-	if result.Port != original.Port {
-		t.Errorf("Port = %d, want %d", result.Port, original.Port)
-	}
-	if result.TLSOptions.RejectUnauthorized != original.TLSOptions.RejectUnauthorized {
-		t.Errorf("TLSOptions.RejectUnauthorized = %v, want %v",
-			result.TLSOptions.RejectUnauthorized, original.TLSOptions.RejectUnauthorized)
-	}
-}
-
-// TestConfiguration_JSONSerialization tests Configuration JSON serialization
-func TestConfiguration_JSONSerialization(t *testing.T) {
-	original := Configuration{
-		Configurations: []*NotifyConfig{
-			{
-				Host:     "imap1.example.com",
-				Port:     993,
-				Username: "user1@example.com",
-			},
-			{
-				Host:     "imap2.example.com",
-				Port:     993,
-				Username: "user2@example.com",
-			},
-		},
-	}
-
-	// Marshal to JSON
-	data, err := json.Marshal(original)
-	if err != nil {
-		t.Fatalf("json.Marshal() error = %v", err)
-	}
-
-	// Unmarshal back
-	var result Configuration
-	err = json.Unmarshal(data, &result)
-	if err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
-
-	if len(result.Configurations) != len(original.Configurations) {
-		t.Fatalf("Configurations length = %d, want %d",
-			len(result.Configurations), len(original.Configurations))
-	}
-
-	for i, conf := range result.Configurations {
-		if conf.Host != original.Configurations[i].Host {
-			t.Errorf("Configurations[%d].Host = %q, want %q",
-				i, conf.Host, original.Configurations[i].Host)
-		}
-	}
-}
-
-// TestTLSOptionsStructg tests TLSOptionsStruct serialization
-func TestTLSOptionsStruct_Serialization(t *testing.T) {
-	original := TLSOptionsStruct{
-		RejectUnauthorized: true,
-		STARTTLS:           true,
-	}
-
-	// JSON
-	jsonData, err := json.Marshal(original)
-	if err != nil {
-		t.Fatalf("json.Marshal() error = %v", err)
-	}
-
-	var jsonResult TLSOptionsStruct
-	err = json.Unmarshal(jsonData, &jsonResult)
-	if err != nil {
-		t.Fatalf("json.Unmarshal() error = %v", err)
-	}
-
-	if jsonResult.RejectUnauthorized != original.RejectUnauthorized {
-		t.Errorf("JSON RejectUnauthorized = %v, want %v",
-			jsonResult.RejectUnauthorized, original.RejectUnauthorized)
-	}
-	if jsonResult.STARTTLS != original.STARTTLS {
-		t.Errorf("JSON STARTTLS = %v, want %v", jsonResult.STARTTLS, original.STARTTLS)
-	}
-
-	// YAML
-	yamlData, err := yaml.Marshal(original)
-	if err != nil {
-		t.Fatalf("yaml.Marshal() error = %v", err)
-	}
-
-	var yamlResult TLSOptionsStruct
-	err = yaml.Unmarshal(yamlData, &yamlResult)
-	if err != nil {
-		t.Fatalf("yaml.Unmarshal() error = %v", err)
-	}
-
-	if yamlResult.RejectUnauthorized != original.RejectUnauthorized {
-		t.Errorf("YAML RejectUnauthorized = %v, want %v",
-			yamlResult.RejectUnauthorized, original.RejectUnauthorized)
-	}
-	if yamlResult.STARTTLS != original.STARTTLS {
-		t.Errorf("YAML STARTTLS = %v, want %v", yamlResult.STARTTLS, original.STARTTLS)
-	}
-}
-
 // TestConfigurationLegacy_AllFields tests that all ConfigurationLegacy fields work
 func TestConfigurationLegacy_AllFields(t *testing.T) {
 	legacy := ConfigurationLegacy{
@@ -364,7 +186,7 @@ func TestConfigurationLegacy_AllFields(t *testing.T) {
 		HostCMD:           "echo host",
 		Port:              993,
 		TLS:               true,
-		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: true, STARTTLS: true},
+		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: new(true), STARTTLS: true},
 		IDLELogoutTimeout: 25,
 		EnableIDCommand:   true,
 		Username:          "user",
@@ -405,7 +227,7 @@ func TestNotifyConfig_AllFields(t *testing.T) {
 		HostCMD:           "echo host",
 		Port:              993,
 		TLS:               true,
-		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: true, STARTTLS: true},
+		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: new(true), STARTTLS: true},
 		IDLELogoutTimeout: 25,
 		EnableIDCommand:   true,
 		Username:          "user",

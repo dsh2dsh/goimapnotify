@@ -9,7 +9,8 @@ import (
 
 var (
 	emailRegexp           = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
-	detectPasswordInLOGIN = regexp.MustCompile(`^(.*LOGIN\s+\S+\s+)"[^"]+"(.*)$`)
+	detectPasswordInLOGIN = regexp.MustCompile(`^(?i)(.*LOGIN\s+\S+\s+)"[^"]+"(.*)$`)
+	oauthTokenRegexp      = regexp.MustCompile(`(auth=Bearer )([^\x00\x01\r\n\t ]+)`)
 )
 
 // censorCredentials pipes input to output while censoring sensitive information
@@ -17,7 +18,8 @@ func censorCredentials(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
 		line := scanner.Text()
-		censoredLine := censorEmailAddress(censorPasswordInLogin(line))
+		censoredLine := censorEmailAddress(censorOAuthToken(
+			censorPasswordInLogin(line)))
 
 		_, err := out.Write([]byte(censoredLine + "\n"))
 		if err != nil {
@@ -37,6 +39,12 @@ func censorPasswordInLogin(in string) string {
 		return in
 	}
 	return matches[1] + `"****"` + matches[2]
+}
+
+// censorOAuthToken replaces XOAUTH2/OAUTHBEARER bearer tokens with asterisks.
+// SASL token payloads appear as "auth=Bearer <token>" in the raw debug stream.
+func censorOAuthToken(in string) string {
+	return oauthTokenRegexp.ReplaceAllString(in, `${1}****`)
 }
 
 // censorEmailAddress replaces email addresses with asterisks

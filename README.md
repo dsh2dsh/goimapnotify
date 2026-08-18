@@ -177,6 +177,12 @@ then wait for events from your IMAP server.
 - `passwordCMD`: is an executable or script that retrieves your password from
   somewhere, we cannot pass arguments to this command from `Stdin`.
 
+  > ⚠️ **Security**: Commands run via `passwordCMD`, `usernameCMD`, and `hostCMD`
+  > are executed through a shell (`sh -c`). Avoid embedding secrets literally in
+  > the command - use an external secret manager (e.g., `pass`, `gopass`,
+  > `oauth2l`) so credentials are not visible in the process list
+  > (`/proc/PID/cmdline`).
+
 - `xoAuth2`: is an option that allow us to login on your IMAP using OAuth2, **be
   aware**: the token is retrieve from `passwordCMD` (see
   shackra/goimapnotify#9).
@@ -195,9 +201,16 @@ then wait for events from your IMAP server.
   error message, causing goimapnotify to fail)
 
 The application will use TLS as long as the IMAP server advertises this
-capability. If you use self-signed certificates or something, be sure to set
-`rejectUnauthorized` as `false`. To enable TLS connection, set `tls` as `true`
-and `starttls` as `false`
+capability. **Certificate verification is enabled by default** - set
+`rejectUnauthorized` to `false` only if you must connect to a server with a
+self-signed or untrusted certificate.
+
+To enable TLS connection, set `tls` as `true` and `starttls` as `false`
+
+> ⚠️ **Windows users**: On Windows, the `onNewMail`/`onChangedMail`/etc. command
+> strings use `cmd /c` for execution, and mailbox names substituted via `%s` are
+> **not** quoted. Avoid mailbox names containing shell metacharacters (`&`, `|`,
+> `;`, etc.).
 
 If your host do not offer IDLE, a sane default of checking every 15 minutes will
 take place instead.

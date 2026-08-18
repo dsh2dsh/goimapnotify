@@ -70,14 +70,14 @@ func New(conf *config.NotifyConfig, retries int, opts ...option,
 		case conf.TLS && !conf.TLSOptions.STARTTLS:
 			imapOpts.TLSConfig = &tls.Config{
 				ServerName:         conf.Host,
-				InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
+				InsecureSkipVerify: !conf.TLSOptions.GetRejectUnauthorized(),
 				MinVersion:         tls.VersionTLS12,
 			}
 			c, err = imapclient.DialTLS(server, imapOpts)
 		case conf.TLS && conf.TLSOptions.STARTTLS:
 			imapOpts.TLSConfig = &tls.Config{
 				ServerName:         conf.Host,
-				InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
+				InsecureSkipVerify: !conf.TLSOptions.GetRejectUnauthorized(),
 			}
 			c, err = imapclient.DialStartTLS(server, imapOpts)
 		default:
