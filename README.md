@@ -81,16 +81,24 @@ testing.
     - host: "imap.fastmail.com"
       boxes:
         - mailbox: "INBOX"
-        notificationActions:
-          - key: "default"
-            label: "View"
-            exec: [ "xdg-open", "https://app.fastmail.com/mail/Inbox/" ]
+          notificationActions:
+            - key: "default"
+              label: "View"
+              exec: [ "xdg-open", "https://app.fastmail.com/mail/Inbox/" ]
+              closeAll: false
+              closeSame: false
+              close: false
   ```
 
   With this configuration it runs `xdg-open` on click, because `default` is a
   magic key for defining on click actions. Anything else can be used as value of
   `key` and it must be uniq. As an example one possible rendering of actions
   would be as buttons in the notification popup.
+
+  `closeAll` configures goimapnotify to close all notications on click.
+  `closeSame` - closes all notifications about this mailbox. `close` closes just
+  this notification. All 3 options are `false` by default, but an action with
+  `key: default` may be auto closed by DE. At least KDE closes it on click.
 
   Test notification can be sent using `goimapotify test-notify`.
 

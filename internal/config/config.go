@@ -114,4 +114,8 @@ type NotificationAction struct {
 	Key   string   `yaml:"key"   validate:"required"`
 	Label string   `yaml:"label" validate:"required"`
 	Exec  []string `yaml:"exec"  validate:"min=1,dive,required"`
+
+	Close     bool `yaml:"close"`
+	CloseSame bool `yaml:"closeSame"`
+	CloseAll  bool `yaml:"closeAll"`
 }

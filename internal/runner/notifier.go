@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"log/slog"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,7 +91,7 @@ func (self *notifier) notificationAction(sig *notify.ActionInvokedSignal) {
 	l.Info("got desktop notification action",
 		slog.Int64("running", self.running.Load()))
 
-	h := self.actionHandler(sig.ID)
+	h := self.actionHandler(sig)
 	if h == nil {
 		slog.Warn("unknown desktop notification action")
 		return
@@ -102,18 +104,53 @@ func (self *notifier) notificationAction(sig *notify.ActionInvokedSignal) {
 	})
 }
 
-func (self *notifier) actionHandler(id uint32) *handler {
+func (self *notifier) actionHandler(sig *notify.ActionInvokedSignal) *handler {
 	self.mu.Lock()
-	h, ok := self.handlers[id]
-	if ok {
-		delete(self.handlers, id)
+	defer self.mu.Unlock()
+
+	h, ok := self.handlers[sig.ID]
+	if !ok {
+		return nil
 	}
-	self.mu.Unlock()
+	self.closeNotifications(h, sig)
 	return h
 }
 
+func (self *notifier) closeNotifications(h *handler,
+	sig *notify.ActionInvokedSignal,
+) {
+	var idSeq iter.Seq[uint32]
+	switch c := h.ActionConfig(sig.ActionKey); {
+	case c.CloseAll:
+		idSeq = maps.Keys(self.handlers)
+	case c.CloseSame:
+		idSeq = func(yield func(uint32) bool) {
+			for id, h2 := range self.handlers {
+				if h2 == h && !yield(id) {
+					return
+				}
+			}
+		}
+	case c.Close:
+		idSeq = func(yield func(uint32) bool) { yield(sig.ID) }
+	default:
+		delete(self.handlers, sig.ID)
+		return
+	}
+
+	for id := range idSeq {
+		_, err := self.notifier.CloseNotification(id)
+		if err != nil {
+			slog.Error("unable close desktop notification",
+				slog.Uint64("id", uint64(id)), slog.Any("error", err))
+			break
+		}
+		delete(self.handlers, id)
+	}
+}
+
 func (self *notifier) notificationClosed(sig *notify.NotificationClosedSignal) {
-	slog.Debug("desktop notification closed",
+	slog.Info("desktop notification closed",
 		slog.Uint64("id", uint64(sig.ID)),
 		slog.String("reason", sig.Reason.String()))
 	self.mu.Lock()

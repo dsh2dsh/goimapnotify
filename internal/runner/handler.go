@@ -241,3 +241,11 @@ func (self *handler) OnAction(ctx context.Context, actionKey string,
 	}
 	printCommandOutput(slog.LevelInfo, "stdout: ", output)
 }
+
+func (self *handler) ActionConfig(key string) *config.NotificationAction {
+	return self.boxActions[key]
+}
+
+func (self *handler) Alias() string { return self.box.Alias() }
+
+func (self *handler) Mailbox() string { return self.box.Mailbox }
