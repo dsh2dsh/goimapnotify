@@ -150,7 +150,7 @@ func (self *notifier) closeNotifications(h *handler,
 }
 
 func (self *notifier) notificationClosed(sig *notify.NotificationClosedSignal) {
-	slog.Info("desktop notification closed",
+	slog.Debug("desktop notification closed",
 		slog.Uint64("id", uint64(sig.ID)),
 		slog.String("reason", sig.Reason.String()))
 	self.mu.Lock()
