@@ -29,11 +29,17 @@ import (
 	"gitlab.com/shackra/goimapnotify/internal/config"
 )
 
+// shellQuote wraps s in single quotes for safe POSIX shell use.
+// An embedded single quote is escaped by closing, quoting, and reopening it.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 // PrepareCommand parses a string and returns a command executable by Go
 func PrepareCommand(command string, rsp config.IDLEEvent) *exec.Cmd {
 	var commandstr string
 	if strings.Contains(command, "%s") {
-		commandstr = fmt.Sprintf(command, rsp.Mailbox)
+		commandstr = fmt.Sprintf(command, shellQuote(rsp.Mailbox))
 	} else {
 		commandstr = command
 	}

@@ -23,6 +23,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+func boolPtr(b bool) *bool { return &b }
+
 // TestEventType_Constants tests that EventType constants have expected values
 func TestEventType_Constants(t *testing.T) {
 	// Verify constants are sequential starting from 1
@@ -178,7 +180,7 @@ func TestLegacyConverter(t *testing.T) {
 		Port:    993,
 		TLS:     true,
 		TLSOptions: TLSOptionsStruct{
-			RejectUnauthorized: true,
+			RejectUnauthorized: boolPtr(true),
 			STARTTLS:           false,
 		},
 		IDLELogoutTimeout: 30,
@@ -218,9 +220,12 @@ func TestLegacyConverter(t *testing.T) {
 	if conf.TLS != legacy.TLS {
 		t.Errorf("TLS = %v, want %v", conf.TLS, legacy.TLS)
 	}
-	if conf.TLSOptions.RejectUnauthorized != legacy.TLSOptions.RejectUnauthorized {
-		t.Errorf("TLSOptions.RejectUnauthorized = %v, want %v",
-			conf.TLSOptions.RejectUnauthorized, legacy.TLSOptions.RejectUnauthorized)
+	if conf.TLSOptions.RejectUnauthorizedOrDefault() != legacy.TLSOptions.RejectUnauthorizedOrDefault() {
+		t.Errorf(
+			"TLSOptions.RejectUnauthorized = %v, want %v",
+			conf.TLSOptions.RejectUnauthorizedOrDefault(),
+			legacy.TLSOptions.RejectUnauthorizedOrDefault(),
+		)
 	}
 	if conf.TLSOptions.STARTTLS != legacy.TLSOptions.STARTTLS {
 		t.Errorf("TLSOptions.STARTTLS = %v, want %v",
@@ -605,7 +610,7 @@ func TestNotifyConfig_YAMLSerialization(t *testing.T) {
 		Username: "user@example.com",
 		Password: "secret",
 		TLSOptions: TLSOptionsStruct{
-			RejectUnauthorized: true,
+			RejectUnauthorized: boolPtr(true),
 			STARTTLS:           false,
 		},
 		Boxes: []Box{
@@ -633,9 +638,12 @@ func TestNotifyConfig_YAMLSerialization(t *testing.T) {
 	if result.Port != original.Port {
 		t.Errorf("Port = %d, want %d", result.Port, original.Port)
 	}
-	if result.TLSOptions.RejectUnauthorized != original.TLSOptions.RejectUnauthorized {
-		t.Errorf("TLSOptions.RejectUnauthorized = %v, want %v",
-			result.TLSOptions.RejectUnauthorized, original.TLSOptions.RejectUnauthorized)
+	if result.TLSOptions.RejectUnauthorizedOrDefault() != original.TLSOptions.RejectUnauthorizedOrDefault() {
+		t.Errorf(
+			"TLSOptions.RejectUnauthorized = %v, want %v",
+			result.TLSOptions.RejectUnauthorizedOrDefault(),
+			original.TLSOptions.RejectUnauthorizedOrDefault(),
+		)
 	}
 }
 
@@ -727,7 +735,7 @@ func TestBox_JSONOmitsInternalFields(t *testing.T) {
 // TestTLSOptionsStruct tests TLSOptionsStruct serialization
 func TestTLSOptionsStruct_Serialization(t *testing.T) {
 	original := TLSOptionsStruct{
-		RejectUnauthorized: true,
+		RejectUnauthorized: boolPtr(true),
 		STARTTLS:           true,
 	}
 
@@ -743,9 +751,9 @@ func TestTLSOptionsStruct_Serialization(t *testing.T) {
 		t.Fatalf("json.Unmarshal() error = %v", err)
 	}
 
-	if jsonResult.RejectUnauthorized != original.RejectUnauthorized {
+	if jsonResult.RejectUnauthorizedOrDefault() != original.RejectUnauthorizedOrDefault() {
 		t.Errorf("JSON RejectUnauthorized = %v, want %v",
-			jsonResult.RejectUnauthorized, original.RejectUnauthorized)
+			jsonResult.RejectUnauthorizedOrDefault(), original.RejectUnauthorizedOrDefault())
 	}
 	if jsonResult.STARTTLS != original.STARTTLS {
 		t.Errorf("JSON STARTTLS = %v, want %v", jsonResult.STARTTLS, original.STARTTLS)
@@ -763,9 +771,9 @@ func TestTLSOptionsStruct_Serialization(t *testing.T) {
 		t.Fatalf("yaml.Unmarshal() error = %v", err)
 	}
 
-	if yamlResult.RejectUnauthorized != original.RejectUnauthorized {
+	if yamlResult.RejectUnauthorizedOrDefault() != original.RejectUnauthorizedOrDefault() {
 		t.Errorf("YAML RejectUnauthorized = %v, want %v",
-			yamlResult.RejectUnauthorized, original.RejectUnauthorized)
+			yamlResult.RejectUnauthorizedOrDefault(), original.RejectUnauthorizedOrDefault())
 	}
 	if yamlResult.STARTTLS != original.STARTTLS {
 		t.Errorf("YAML STARTTLS = %v, want %v", yamlResult.STARTTLS, original.STARTTLS)
@@ -809,7 +817,7 @@ func TestConfigurationLegacy_AllFields(t *testing.T) {
 		HostCMD:           "echo host",
 		Port:              993,
 		TLS:               true,
-		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: true, STARTTLS: true},
+		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: boolPtr(true), STARTTLS: true},
 		IDLELogoutTimeout: 25,
 		EnableIDCommand:   true,
 		Username:          "user",
@@ -850,7 +858,7 @@ func TestNotifyConfig_AllFields(t *testing.T) {
 		HostCMD:           "echo host",
 		Port:              993,
 		TLS:               true,
-		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: true, STARTTLS: true},
+		TLSOptions:        TLSOptionsStruct{RejectUnauthorized: boolPtr(true), STARTTLS: true},
 		IDLELogoutTimeout: 25,
 		EnableIDCommand:   true,
 		Username:          "user",

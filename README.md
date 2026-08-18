@@ -1,4 +1,5 @@
 # goimapnotify
+
 [![pipeline status](https://gitlab.com/shackra/goimapnotify/badges/master/pipeline.svg)](https://gitlab.com/shackra/goimapnotify/commits/master)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K1XEZCQ)
 [![Radicle](https://img.shields.io/badge/Radicle-rad%3Az39RJH...d1LFah-purple?style=for-the-badge)](https://radicle.network/nodes/jardin.jorgearaya.dev/rad:z39RJHSHs166S5kr8Qstj6kd1LFah)
@@ -15,7 +16,7 @@ Execute scripts on IMAP mailbox changes (new/deleted/updated messages) using IDL
 
 Please read the `CHANGELOG` file to know what's new.
 
-🗊 **You can also check what's new at ko-fi, read in English or Spanish**: https://ko-fi.com/shackra/posts
+🗊 **You can also check what's new at ko-fi, read in English or Spanish**: <https://ko-fi.com/shackra/posts>
 
 This application is mostly compatible with the configuration of [imapnotify made with Python](https://github.com/a-sk/python-imapnotify) (be sure to change `password_eval` to `passwordCMD`, see [issue #3](https://gitlab.com/shackra/goimapnotify/issues/3)), the following are all options available for the configuration:
 
@@ -81,14 +82,17 @@ On first start, the application will run `onNewMail` and `onNewMailPost` and the
 - `hostCMD`: is an executable or script that retrieves your host from somewhere, we cannot pass arguments to this command from `Stdin`.
 - `usernameCMD`: is an executable or script that retrieves your username from somewhere, we cannot pass arguments to this command from `Stdin`.
 - `passwordCMD`: is an executable or script that retrieves your password from somewhere, we cannot pass arguments to this command from `Stdin`.
+  > ⚠️ **Security**: Commands run via `passwordCMD`, `usernameCMD`, and `hostCMD` are executed through a shell (`sh -c`). Avoid embedding secrets literally in the command — use an external secret manager (e.g., `pass`, `gopass`, `oauth2l`) so credentials are not visible in the process list (`/proc/PID/cmdline`).
 - `xoAuth2`: is an option that allow us to login on your IMAP using OAuth2, **be aware**: the token is retrieve from `passwordCMD` (see shackra/goimapnotify#9).
 - `wait`: is the delay in seconds before the mail syncing is trigger (see shackra/goimapnotify#10).
 - `boxes`: List of mailboxes. If none is defined, all will be monitored.
 - `idleLogoutTimeout`: Change the time between restarts of the IDLE command (see shackra/goimapnotify#49)
 - `enableIDCommand`: Tell goimapotify that your server needs (and supports!) the ID command (see shackra/goimapnotify#58 shackra/goimapnotify#57; the servers in those tickets did not support ID and they responded with a non-standard error message, causing goimapnotify to fail)
 
-The application will use TLS as long as the IMAP server advertises this capability. If you use self-signed certificates or something, be sure to set `rejectUnauthorized` as `false`.
+The application will use TLS as long as the IMAP server advertises this capability. **Certificate verification is enabled by default** — set `rejectUnauthorized` to `false` only if you must connect to a server with a self-signed or untrusted certificate.
 To enable TLS connection, set `tls` as `true` and `starttls` as `false`
+
+> ⚠️ **Windows users**: On Windows, the `onNewMail`/`onChangedMail`/etc. command strings use `cmd /c` for execution, and mailbox names substituted via `%s` are **not** quoted. Avoid mailbox names containing shell metacharacters (`&`, `|`, `;`, etc.).
 
 If your host do not offer IDLE, a sane default of checking every 15 minutes will take place instead.
 
@@ -121,7 +125,9 @@ As you can notice, `-list` can help you figure out the mailbox hierarchy of your
 </a>
 
 # Development
+
 nix-flake is use for development, is great and [you should try it](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#the-determinate-nix-installer) too! Activate support for flake in your nix installation and the environment will setup ✨*automagically*✨ for you.
 
 ## Generating and editing the CHANGELOG
+
 When I started this project, I was naive and inexperienced with the fundamentals of software development, that has make most commits in this project have inconsistent titles that make it harder for tools like [`git-chglog`](https://github.com/git-chglog/git-chglog) help with CHANGELOG generation. I generated an ["old" CHANGELOG](./CHANGELOG_old.md) that contains all information until tag `2.3.13`. So, from now on, generate the CHANGELOG from tag `2.3.14` onwards, please and thank you!.

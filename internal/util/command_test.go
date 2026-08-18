@@ -45,7 +45,7 @@ func TestPrepareCommand(t *testing.T) {
 			event: config.IDLEEvent{
 				Mailbox: "INBOX",
 			},
-			wantArgs: []string{"sh", "-c", "mbsync INBOX"},
+			wantArgs: []string{"sh", "-c", "mbsync 'INBOX'"},
 		},
 		{
 			name:     "command with quotes",
@@ -59,7 +59,7 @@ func TestPrepareCommand(t *testing.T) {
 			event: config.IDLEEvent{
 				Mailbox: "INBOX",
 			},
-			wantArgs: []string{"sh", "-c", "echo INBOX %!s(MISSING)"},
+			wantArgs: []string{"sh", "-c", "echo 'INBOX' %!s(MISSING)"},
 		},
 		{
 			name:     "command with pipes",
@@ -85,7 +85,7 @@ func TestPrepareCommand(t *testing.T) {
 			event: config.IDLEEvent{
 				Mailbox: "INBOX/Subfolder",
 			},
-			wantArgs: []string{"sh", "-c", "mbsync 'INBOX/Subfolder'"},
+			wantArgs: []string{"sh", "-c", "mbsync ''INBOX/Subfolder''"},
 		},
 	}
 

@@ -78,7 +78,7 @@ func NewClientWithDialer(
 		if conf.TLS && !conf.TLSOptions.STARTTLS {
 			c, err = dialer.DialTLS(server, &tls.Config{
 				ServerName:         conf.Host,
-				InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
+				InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorizedOrDefault(),
 				MinVersion:         tls.VersionTLS12,
 			})
 		} else {
@@ -126,7 +126,7 @@ func NewClientWithDialer(
 	if conf.TLS && conf.TLSOptions.STARTTLS {
 		err = c.StartTLS(&tls.Config{
 			ServerName:         conf.Host,
-			InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorized,
+			InsecureSkipVerify: !conf.TLSOptions.RejectUnauthorizedOrDefault(),
 		})
 		if err != nil {
 			return nil, err
@@ -148,10 +148,15 @@ func NewClientWithDialer(
 				imapid.FieldVersion: Version,
 			})
 			if err != nil {
-				if !strings.Contains(err.Error(), "Parameter list contains a non-string: expected a string") && !strings.Contains(err.Error(), "Unrecognised command") {
+				if !strings.Contains(
+					err.Error(),
+					"Parameter list contains a non-string: expected a string",
+				) &&
+					!strings.Contains(err.Error(), "Unrecognised command") {
 					return nil, err
 				}
-				logrus.WithError(err).Debug("IMAP server supports ID command but gave malformed response, ignoring...")
+				logrus.WithError(err).
+					Debug("IMAP server supports ID command but gave malformed response, ignoring...")
 			}
 		}
 	} else {

@@ -29,6 +29,8 @@ import (
 	"gitlab.com/shackra/goimapnotify/internal/config"
 )
 
+func boolPtr(b bool) *bool { return &b }
+
 // MockIMAPClient is a mock implementation of IMAPClientInterface for testing
 type MockIMAPClient struct {
 	// Configurable behavior
@@ -239,7 +241,7 @@ func TestNewClientWithDialer(t *testing.T) {
 				Username: "user@example.com",
 				Password: "password123",
 				TLSOptions: config.TLSOptionsStruct{
-					RejectUnauthorized: true,
+					RejectUnauthorized: boolPtr(true),
 					STARTTLS:           false,
 				},
 			},
@@ -260,7 +262,7 @@ func TestNewClientWithDialer(t *testing.T) {
 				Username: "user@example.com",
 				Password: "password123",
 				TLSOptions: config.TLSOptionsStruct{
-					RejectUnauthorized: true,
+					RejectUnauthorized: boolPtr(true),
 					STARTTLS:           true,
 				},
 			},
@@ -532,7 +534,7 @@ func TestNewClientWithDialer_TLSConfig(t *testing.T) {
 				Port: 993,
 				TLS:  true,
 				TLSOptions: config.TLSOptionsStruct{
-					RejectUnauthorized: true,
+					RejectUnauthorized: boolPtr(true),
 					STARTTLS:           false,
 				},
 				Username: "user",
@@ -549,7 +551,7 @@ func TestNewClientWithDialer_TLSConfig(t *testing.T) {
 				Port: 993,
 				TLS:  true,
 				TLSOptions: config.TLSOptionsStruct{
-					RejectUnauthorized: false,
+					RejectUnauthorized: boolPtr(false),
 					STARTTLS:           false,
 				},
 				Username: "user",
@@ -557,6 +559,19 @@ func TestNewClientWithDialer_TLSConfig(t *testing.T) {
 			},
 			wantTLSDial:            true,
 			wantInsecureSkipVerify: true,
+			wantServerName:         "imap.example.com",
+		},
+		{
+			name: "TLS with unset certificate verification (defaults to verify)",
+			conf: config.NotifyConfig{
+				Host:     "imap.example.com",
+				Port:     993,
+				TLS:      true,
+				Username: "user",
+				Password: "pass",
+			},
+			wantTLSDial:            true,
+			wantInsecureSkipVerify: false,
 			wantServerName:         "imap.example.com",
 		},
 	}
@@ -782,7 +797,7 @@ func TestNewClientWithDialer_STARTTLS(t *testing.T) {
 		Password: "pass",
 		TLSOptions: config.TLSOptionsStruct{
 			STARTTLS:           true,
-			RejectUnauthorized: true,
+			RejectUnauthorized: boolPtr(true),
 		},
 	}
 

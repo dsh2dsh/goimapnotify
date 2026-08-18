@@ -131,6 +131,7 @@ func loadConfiguration(path string, retries int) (*config.Configuration, error) 
 			go func() {
 				err := client.List("", "*", ch)
 				if err != nil {
+					_ = client.Logout()
 					logrus.WithError(err).
 						WithField("account", conf.Username).
 						Fatal("failed to list all mailboxes")
@@ -148,6 +149,9 @@ func loadConfiguration(path string, retries int) (*config.Configuration, error) 
 					Mailbox: mailbox.Name,
 				})
 				if err != nil {
+					// Deliberately no client.Logout() here: the List goroutine above may
+					// still be running on the same connection, and go-imap is not safe
+					// for concurrent commands. Fatal->os.Exit will drop the TCP conn.
 					logrus.WithError(err).Fatal("template is invalid")
 				}
 				topConfiguration.Configurations[account].Boxes = append(
@@ -284,6 +288,7 @@ func main() {
 			logrus.WithField("account", account.Alias).Info("walking through the account mailboxes")
 			err = util.WalkMailbox(client, "", 0, max)
 			if err != nil {
+				_ = client.Logout()
 				logrus.WithField("account", account.Alias).
 					WithError(err).
 					Fatal("something went wrong while walking on the account listing all mailboxes")
@@ -366,7 +371,7 @@ func main() {
 	}
 
 	var networkDown bool
-	var pendingReconnects []imap.BoxEvent
+	pendingReconnects := make(map[string]imap.BoxEvent)
 
 	for idleForever {
 		select {
@@ -393,7 +398,7 @@ func main() {
 							*dialRetries,
 						)
 					}
-					pendingReconnects = nil
+					pendingReconnects = make(map[string]imap.BoxEvent)
 				}
 			}
 		case boxEvent := <-boxChan:
@@ -401,7 +406,8 @@ func main() {
 				WithField("mailbox", boxEvent.Mailbox.Mailbox)
 			if networkDown {
 				l.Info("Watcher stopped, deferring reconnection until network is restored")
-				pendingReconnects = append(pendingReconnects, boxEvent)
+				key := boxEvent.Mailbox.Alias + boxEvent.Mailbox.Mailbox
+				pendingReconnects[key] = boxEvent
 				continue
 			}
 			l.Info("Restarting watcher for mailbox")
