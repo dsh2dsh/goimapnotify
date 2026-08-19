@@ -5,14 +5,12 @@ import (
 	"context"
 	"log/slog"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/esiqveland/notify"
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
-	"github.com/dsh2dsh/goimapnotify/internal/command"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 )
 
@@ -125,13 +123,12 @@ func (self *handler) processEvents(ctx context.Context) error {
 		slog.String("mailbox", self.box.Mailbox))
 	l.Debug("Running synchronization...")
 
-	for s, err := range self.events.Commands(l) {
+	for cmd, err := range self.events.Commands(ctx, l) {
 		if err != nil {
 			return err
 		}
 
-		cmd := command.NewContext(ctx, s)
-		output, err := execCommand(cmd, s)
+		output, err := execCommand(cmd)
 		if err != nil {
 			return err
 		}
@@ -234,7 +231,7 @@ func (self *handler) OnAction(ctx context.Context, actionKey string,
 	}
 
 	cmd := exec.CommandContext(ctx, act.Exec[0], act.Exec[1:]...)
-	output, err := execCommand(cmd, strings.Join(act.Exec, " "))
+	output, err := execCommand(cmd)
 	if err != nil {
 		slog.Error("desktop notification action failed", slog.Any("error", err))
 		return

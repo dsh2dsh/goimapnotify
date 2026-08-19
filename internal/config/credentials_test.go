@@ -20,67 +20,67 @@ package config
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestRetrieveCmd(t *testing.T) {
 	tests := []struct {
 		name         string
 		conf         NotifyConfig
+		yaml         string
 		wantPassword string
 		wantUsername string
 		wantHost     string
 	}{
 		{
 			name: "all CMDs set",
-			conf: NotifyConfig{
-				PasswordCMD: "echo secret",
-				UsernameCMD: "echo user@example.com",
-				HostCMD:     "echo imap.example.com",
-			},
+			yaml: `
+passwordCMD: "echo secret"
+usernameCMD: "echo user@example.com"
+hostCMD:		 "echo imap.example.com"`,
 			wantPassword: "secret",
 			wantUsername: "user@example.com",
 			wantHost:     "imap.example.com",
 		},
 		{
 			name: "only PasswordCMD set",
-			conf: NotifyConfig{
-				PasswordCMD: "echo secret",
-				Username:    "static@example.com",
-				Host:        "static.example.com",
-			},
+			yaml: `
+passwordCMD: "echo secret"
+username:		 "static@example.com"
+host:				 "static.example.com"`,
 			wantPassword: "secret",
 			wantUsername: "static@example.com",
 			wantHost:     "static.example.com",
 		},
 		{
 			name: "only UsernameCMD set",
-			conf: NotifyConfig{
-				Password:    "staticpass",
-				UsernameCMD: "echo dynamic@example.com",
-				Host:        "static.example.com",
-			},
+			yaml: `
+password:		 "staticpass"
+usernameCMD: "echo dynamic@example.com"
+host:				 "static.example.com"`,
 			wantPassword: "staticpass",
 			wantUsername: "dynamic@example.com",
 			wantHost:     "static.example.com",
 		},
 		{
 			name: "only HostCMD set",
-			conf: NotifyConfig{
-				Password: "staticpass",
-				Username: "static@example.com",
-				HostCMD:  "echo dynamic.example.com",
-			},
+			yaml: `
+password: "staticpass"
+username: "static@example.com"
+hostCMD:	"echo dynamic.example.com"`,
 			wantPassword: "staticpass",
 			wantUsername: "static@example.com",
 			wantHost:     "dynamic.example.com",
 		},
 		{
 			name: "no CMDs set",
-			conf: NotifyConfig{
-				Password: "staticpass",
-				Username: "static@example.com",
-				Host:     "static.example.com",
-			},
+			yaml: `
+password: "staticpass"
+username: "static@example.com"
+host:			"static.example.com"`,
 			wantPassword: "staticpass",
 			wantUsername: "static@example.com",
 			wantHost:     "static.example.com",
@@ -89,21 +89,15 @@ func TestRetrieveCmd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.conf
+			var result NotifyConfig
+			require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &result))
 			result.RetrieveCmd()
 
-			if result.Password != tt.wantPassword {
-				t.Errorf("RetrieveCmd() Password = %q, want %q",
-					result.Password, tt.wantPassword)
-			}
-			if result.Username != tt.wantUsername {
-				t.Errorf("RetrieveCmd() Username = %q, want %q",
-					result.Username, tt.wantUsername)
-			}
-			if result.Host != tt.wantHost {
-				t.Errorf("RetrieveCmd() Host = %q, want %q",
-					result.Host, tt.wantHost)
-			}
+			assert.Equal(t, tt.wantPassword, result.Password,
+				"RetrieveCmd() Password")
+			assert.Equal(t, tt.wantUsername, result.Username,
+				"RetrieveCmd() Username")
+			assert.Equal(t, tt.wantHost, result.Host, "RetrieveCmd() Host")
 		})
 	}
 }

@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 	"time"
 )
 
-func execCommand(cmd *exec.Cmd, command string) ([]byte, error) {
+func execCommand(cmd *exec.Cmd) ([]byte, error) {
+	command := strings.Join(cmd.Args, " ")
 	slog.Info(command)
 
 	startedAt := time.Now()

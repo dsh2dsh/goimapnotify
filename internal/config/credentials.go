@@ -17,32 +17,54 @@ package config
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"log/slog"
-	"os"
+	"context"
+	"fmt"
 	"strings"
 
-	"github.com/dsh2dsh/goimapnotify/internal/command"
+	"github.com/dsh2dsh/goimapnotify/internal/config/command"
 )
 
 // RetrieveCmd executes all credential commands and updates the config
-func (self *NotifyConfig) RetrieveCmd() {
-	self.Password = retrieveCmd(self.PasswordCMD, self.Password)
-	self.Username = retrieveCmd(self.UsernameCMD, self.Username)
-	self.Host = retrieveCmd(self.HostCMD, self.Host)
-}
-
-func retrieveCmd(cmdLine, def string) string {
-	if cmdLine == "" {
-		return def
+func (self *NotifyConfig) RetrieveCmd() error {
+	cmds := [...]struct {
+		name  string
+		t     *command.Templated
+		value *string
+	}{
+		{"passwordCMD", self.PasswordCMD, &self.Password},
+		{"usernameCMD", self.UsernameCMD, &self.Username},
+		{"hostCMD", self.HostCMD, &self.Host},
 	}
 
-	cmd := command.New(cmdLine)
+	for _, c := range cmds {
+		if err := retrieveCmd(c.t, c.value); err != nil {
+			return fmt.Errorf("retrieve value from %s: %w", c.name, err)
+		}
+	}
+	return nil
+}
+
+func retrieveCmd(t *command.Templated, value *string) error {
+	if t == nil || t.Skip() {
+		return nil
+	}
+
+	if err := t.Compile(); err != nil {
+		return err
+	}
+
+	cmd, err := t.Cmd(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+
 	// Avoid leaking the password
 	cmd.Stdout = nil
 	buf, err := cmd.Output()
 	if err != nil {
-		slog.Error("cannot retrieve password from command", slog.Any("error", err))
-		os.Exit(1)
+		return fmt.Errorf("exec command template: %w", err)
 	}
-	return strings.Trim(string(buf), "\n")
+
+	*value = strings.TrimSpace(string(buf))
+	return nil
 }

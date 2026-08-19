@@ -1,10 +1,11 @@
 package box
 
 import (
-	"bytes"
-	"io"
+	"context"
 	"iter"
 	"log/slog"
+	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -99,55 +100,46 @@ func (self *EventSet) Add(e *IDLE) {
 	self.mu.Unlock()
 }
 
-func (self *EventSet) Commands(l *slog.Logger) iter.Seq2[string, error] {
-	return func(yield func(string, error) bool) {
+func (self *EventSet) Commands(ctx context.Context, l *slog.Logger,
+) iter.Seq2[*exec.Cmd, error] {
+	return func(yield func(*exec.Cmd, error) bool) {
 		self.mu.Lock()
 		events := self.events
 		clear(self.events[:])
 		self.mu.Unlock()
 
 		seen := make(map[string]bool, len(events)*2)
-		var b bytes.Buffer
-
 	eventLoop:
 		for _, e := range events {
 			if e == nil {
 				continue
 			}
 
-			renderers := [...]struct {
-				onCommand func(io.Writer, *IDLE) error
-				onReason  func() string
+			cmds := [...]struct {
+				cmd    func(context.Context, *IDLE) (*exec.Cmd, error)
+				reason func() string
 			}{
-				{
-					onCommand: e.Box().RenderCommandTo,
-					onReason:  e.OnReason,
-				},
-				{
-					onCommand: e.Box().RenderPostCommandTo,
-					onReason:  e.OnReasonPost,
-				},
+				{e.Box().Cmd, e.OnReason},
+				{e.Box().PostCmd, e.OnReasonPost},
 			}
 
-			for _, r := range renderers {
-				if err := r.onCommand(&b, e); err != nil {
-					yield("", err)
+			for _, c := range cmds {
+				cmd, err := c.cmd(ctx, e)
+				if err != nil {
+					yield(nil, err)
 					return
-				}
-
-				cmd := b.String()
-				b.Reset()
-				if cmd == "" || cmd == "SKIP" {
+				} else if cmd == nil {
 					continue eventLoop
 				}
 
-				if seen[cmd] {
+				s := strings.Join(cmd.Args, " ")
+				if seen[s] {
 					l.Debug("skip duplicate command for this mailbox",
-						slog.String("on", r.onReason()))
+						slog.String("on", c.reason()))
 					continue
 				}
 
-				seen[cmd] = true
+				seen[s] = true
 				if !yield(cmd, nil) {
 					return
 				}

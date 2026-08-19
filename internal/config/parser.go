@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,6 +15,14 @@ func LoadYAML(filename string) (*Configuration, error) {
 		return nil, fmt.Errorf("config: read %q: %w", filename, err)
 	}
 
+	cfg, err := LoadBytes(b)
+	if err != nil {
+		return nil, fmt.Errorf("parse configuration: %s: %w", filename, err)
+	}
+	return cfg, nil
+}
+
+func LoadBytes(b []byte) (*Configuration, error) {
 	cfg := &Configuration{
 		MaxDelay:    5 * time.Minute,
 		StartupSync: true,
@@ -25,24 +32,16 @@ func LoadYAML(filename string) (*Configuration, error) {
 		},
 	}
 	if err := yaml.Unmarshal(b, cfg); err != nil {
-		return nil, fmt.Errorf("config: parse yaml %q: %w", filename, err)
+		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
 
 	if cfg.Configurations == nil {
 		var legacy ConfigurationLegacy
 		if err := yaml.Unmarshal(b, &legacy); err != nil {
-			return nil, fmt.Errorf("config: parse yaml in 'legacy' format %q: %w",
-				filename, err)
+			return nil, fmt.Errorf("parse yaml in 'legacy' format: %w", err)
 		}
 		slog.Info("legacy format configuration detected")
 		cfg.Configurations = LegacyConverter(&legacy)
-	}
-
-	invalid := len(cfg.Configurations) == 0 ||
-		(cfg.Configurations[0].Host == "" && cfg.Configurations[0].HostCMD == "")
-	if invalid {
-		return nil, errors.New(
-			"configuration file is empty or have invalid configuration format")
 	}
 
 	if err := validate(cfg); err != nil {

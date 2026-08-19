@@ -1,6 +1,12 @@
 package config
 
-import "time"
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/dsh2dsh/goimapnotify/internal/config/command"
+)
 
 // This file is part of goimapnotify
 // Copyright (C) 2017-2026	Jorge Javier Araya Navarro
@@ -37,55 +43,55 @@ type DesktopNotification struct {
 
 // ConfigurationLegacy holds the old configuration format
 type ConfigurationLegacy struct {
-	Host              string           `yaml:"host"              json:"host"`
-	HostCMD           string           `yaml:"hostCMD"           json:"hostCMD"`
-	Port              int              `yaml:"port"              json:"port"`
-	TLS               bool             `yaml:"tls"               json:"tls"`
-	TLSOptions        TLSOptionsStruct `yaml:"tlsOptions"        json:"tlsOptions"`
-	IDLELogoutTimeout int              `yaml:"idleLogoutTimeout" json:"idleLogoutTimeout"`
-	EnableIDCommand   bool             `yaml:"enableIDCommand"   json:"enableIDCommand"`
-	Username          string           `yaml:"username"          json:"username"`
-	UsernameCMD       string           `yaml:"usernameCMD"       json:"usernameCMD"`
-	Password          string           `yaml:"password"          json:"password"`
-	PasswordCMD       string           `yaml:"passwordCMD"       json:"passwordCMD"`
-	XOAuth2           bool             `yaml:"xoAuth2"           json:"xoAuth2"`
-	OnNewMail         string           `yaml:"onNewMail"         json:"onNewMail"`
-	OnNewMailPost     string           `yaml:"onNewMailPost"     json:"onNewMailPost"`
-	OnChangedMail     string           `yaml:"onChangedMail"     json:"onChangedMail"`
-	OnChangedMailPost string           `yaml:"onChangedMailPost" json:"onChangedMailPost"`
-	OnDeletedMail     string           `yaml:"onDeletedMail"     json:"onDeletedMail"`
-	OnDeletedMailPost string           `yaml:"onDeletedMailPost" json:"onDeletedMailPost"`
-	Boxes             []string         `yaml:"boxes"             json:"boxes"`
+	Host              string             `yaml:"host"`
+	HostCMD           *command.Templated `yaml:"hostCMD"`
+	Port              int                `yaml:"port"`
+	TLS               bool               `yaml:"tls"`
+	TLSOptions        TLSOptionsStruct   `yaml:"tlsOptions"`
+	IDLELogoutTimeout int                `yaml:"idleLogoutTimeout"`
+	EnableIDCommand   bool               `yaml:"enableIDCommand"`
+	Username          string             `yaml:"username"`
+	UsernameCMD       *command.Templated `yaml:"usernameCMD"`
+	Password          string             `yaml:"password"`
+	PasswordCMD       *command.Templated `yaml:"passwordCMD"`
+	XOAuth2           bool               `yaml:"xoAuth2"`
+	OnNewMail         *command.Templated `yaml:"onNewMail"`
+	OnNewMailPost     *command.Templated `yaml:"onNewMailPost"`
+	OnChangedMail     *command.Templated `yaml:"onChangedMail"`
+	OnChangedMailPost *command.Templated `yaml:"onChangedMailPost"`
+	OnDeletedMail     *command.Templated `yaml:"onDeletedMail"`
+	OnDeletedMailPost *command.Templated `yaml:"onDeletedMailPost"`
+	Boxes             []string           `yaml:"boxes"`
 }
 
 // NotifyConfig holds the configuration for a single account
 type NotifyConfig struct {
-	Host              string           `yaml:"host"              json:"host" validate:"required"`
-	HostCMD           string           `yaml:"hostCMD"           json:"hostCMD"`
-	Port              int              `yaml:"port"              json:"port" validate:"gt=0"`
-	TLS               bool             `yaml:"tls"               json:"tls"`
-	TLSOptions        TLSOptionsStruct `yaml:"tlsOptions"        json:"tlsOptions"`
-	IDLELogoutTimeout int              `yaml:"idleLogoutTimeout" json:"idleLogoutTimeout" validate:"min=0"`
-	EnableIDCommand   bool             `yaml:"enableIDCommand"   json:"enableIDCommand"`
-	Username          string           `yaml:"username"          json:"username"`
-	UsernameCMD       string           `yaml:"usernameCMD"       json:"usernameCMD"`
-	Alias             string           `yaml:"alias"             json:"alias"`
-	Password          string           `yaml:"password"          json:"password"`
-	PasswordCMD       string           `yaml:"passwordCMD"       json:"passwordCMD"`
-	XOAuth2           bool             `yaml:"xoAuth2"           json:"xoAuth2"`
-	OnNewMail         string           `yaml:"onNewMail"         json:"onNewMail"`
-	OnNewMailPost     string           `yaml:"onNewMailPost"     json:"onNewMailPost"`
-	OnChangedMail     string           `yaml:"onChangedMail"     json:"onChangedMail"`
-	OnChangedMailPost string           `yaml:"onChangedMailPost" json:"onChangedMailPost"`
-	OnDeletedMail     string           `yaml:"onDeletedMail"     json:"onDeletedMail"`
-	OnDeletedMailPost string           `yaml:"onDeletedMailPost" json:"onDeletedMailPost"`
-	Boxes             []*Box           `yaml:"boxes"             json:"boxes" validate:"dive"`
+	Host              string             `yaml:"host" validate:"required"`
+	HostCMD           *command.Templated `yaml:"hostCMD" validate:"omitnil,validateFn"`
+	Port              int                `yaml:"port" validate:"gt=0"`
+	TLS               bool               `yaml:"tls"`
+	TLSOptions        TLSOptionsStruct   `yaml:"tlsOptions"`
+	IDLELogoutTimeout int                `yaml:"idleLogoutTimeout" validate:"min=0"`
+	EnableIDCommand   bool               `yaml:"enableIDCommand"`
+	Username          string             `yaml:"username"`
+	UsernameCMD       *command.Templated `yaml:"usernameCMD" validate:"omitnil,validateFn"`
+	Alias             string             `yaml:"alias"`
+	Password          string             `yaml:"password"`
+	PasswordCMD       *command.Templated `yaml:"passwordCMD" validate:"omitnil,validateFn"`
+	XOAuth2           bool               `yaml:"xoAuth2"`
+	OnNewMail         *command.Templated `yaml:"onNewMail" validate:"omitnil,validateFn"`
+	OnNewMailPost     *command.Templated `yaml:"onNewMailPost" validate:"omitnil,validateFn"`
+	OnChangedMail     *command.Templated `yaml:"onChangedMail" validate:"omitnil,validateFn"`
+	OnChangedMailPost *command.Templated `yaml:"onChangedMailPost" validate:"omitnil,validateFn"`
+	OnDeletedMail     *command.Templated `yaml:"onDeletedMail" validate:"omitnil,validateFn"`
+	OnDeletedMailPost *command.Templated `yaml:"onDeletedMailPost" validate:"omitnil,validateFn"`
+	Boxes             []*Box             `yaml:"boxes" validate:"dive"`
 }
 
 // TLSOptionsStruct holds TLS configuration options
 type TLSOptionsStruct struct {
-	RejectUnauthorized *bool `yaml:"rejectUnauthorized" json:"rejectUnauthorized"`
-	STARTTLS           bool  `yaml:"starttls"           json:"starttls"`
+	RejectUnauthorized *bool `yaml:"rejectUnauthorized"`
+	STARTTLS           bool  `yaml:"starttls"`
 }
 
 func (self *TLSOptionsStruct) GetRejectUnauthorized() bool {
@@ -95,27 +101,88 @@ func (self *TLSOptionsStruct) GetRejectUnauthorized() bool {
 	return *self.RejectUnauthorized
 }
 
+func (self *NotifyConfig) CompileTemplates(data any) error {
+	cmds := [...]struct {
+		name string
+		t    *command.Templated
+		data any
+	}{
+		{"onNewMail", self.OnNewMail, data},
+		{"onNewMailPost", self.OnNewMailPost, data},
+		{"onChangedMail", self.OnChangedMail, data},
+		{"onChangedMailPost", self.OnChangedMailPost, data},
+		{"onDeletedMail", self.OnDeletedMail, data},
+		{"onDeletedMailPost", self.OnDeletedMailPost, data},
+	}
+
+	for _, c := range cmds {
+		if c.t == nil {
+			continue
+		}
+		if err := c.t.Compile(); err != nil {
+			return fmt.Errorf("parse %s template: %w", c.name, err)
+		}
+		if _, err := c.t.Cmd(context.Background(), c.data); err != nil {
+			return fmt.Errorf("execute %s template: %w", c.name, err)
+		}
+	}
+
+	for _, b := range self.Boxes {
+		if err := b.CompileTemplates(data); err != nil {
+			return fmt.Errorf("compile mailbox templates: %s: %w", b.Mailbox, err)
+		}
+	}
+	return nil
+}
+
 // Box stores all the necessary info needed to be passed in an
 // IDLEEvent handler routine, in order to schedule commands and
 // print informative messages
 type Box struct {
-	Mailbox           string `json:"mailbox"           yaml:"mailbox" validate:"required"`
-	OnNewMail         string `json:"onNewMail"         yaml:"onNewMail"`
-	OnNewMailPost     string `json:"onNewMailPost"     yaml:"onNewMailPost"`
-	OnChangedMail     string `json:"onChangedMail"     yaml:"onChangedMail"`
-	OnChangedMailPost string `json:"onChangedMailPost" yaml:"onChangedMailPost"`
-	OnDeletedMail     string `json:"onDeletedMail"     yaml:"onDeletedMail"`
-	OnDeletedMailPost string `json:"onDeletedMailPost" yaml:"onDeletedMailPost"`
+	Mailbox           string             `yaml:"mailbox" validate:"required"`
+	OnNewMail         *command.Templated `yaml:"onNewMail" validate:"omitnil,validateFn"`
+	OnNewMailPost     *command.Templated `yaml:"onNewMailPost" validate:"omitnil,validateFn"`
+	OnChangedMail     *command.Templated `yaml:"onChangedMail" validate:"omitnil,validateFn"`
+	OnChangedMailPost *command.Templated `yaml:"onChangedMailPost" validate:"omitnil,validateFn"`
+	OnDeletedMail     *command.Templated `yaml:"onDeletedMail" validate:"omitnil,validateFn"`
+	OnDeletedMailPost *command.Templated `yaml:"onDeletedMailPost" validate:"omitnil,validateFn"`
 
 	NotificationActions []*NotificationAction `yaml:"notificationActions" validate:"dive"`
 }
 
 type NotificationAction struct {
-	Key   string   `yaml:"key"   validate:"required"`
-	Label string   `yaml:"label" validate:"required"`
-	Exec  []string `yaml:"exec"  validate:"min=1,dive,required"`
+	Key       string   `yaml:"key"   validate:"required"`
+	Label     string   `yaml:"label" validate:"required"`
+	Exec      []string `yaml:"exec"  validate:"min=1,dive,required"`
+	Close     bool     `yaml:"close"`
+	CloseSame bool     `yaml:"closeSame"`
+	CloseAll  bool     `yaml:"closeAll"`
+}
 
-	Close     bool `yaml:"close"`
-	CloseSame bool `yaml:"closeSame"`
-	CloseAll  bool `yaml:"closeAll"`
+func (self *Box) CompileTemplates(data any) error {
+	cmds := [...]struct {
+		name string
+		t    *command.Templated
+		data any
+	}{
+		{"onNewMail", self.OnNewMail, data},
+		{"onNewMailPost", self.OnNewMailPost, data},
+		{"onChangedMail", self.OnChangedMail, data},
+		{"onChangedMailPost", self.OnChangedMailPost, data},
+		{"onDeletedMail", self.OnDeletedMail, data},
+		{"onDeletedMailPost", self.OnDeletedMailPost, data},
+	}
+
+	for _, c := range cmds {
+		if c.t == nil {
+			continue
+		}
+		if err := c.t.Compile(); err != nil {
+			return fmt.Errorf("parse %s template: %w", c.name, err)
+		}
+		if _, err := c.t.Cmd(context.Background(), c.data); err != nil {
+			return fmt.Errorf("execute %s template: %w", c.name, err)
+		}
+	}
+	return nil
 }

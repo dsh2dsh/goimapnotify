@@ -33,7 +33,9 @@ func validate(cfg *Configuration) error {
 
 	var sb strings.Builder
 	for _, fe := range fieldErrors {
-		sb.WriteString("invalid configuration:")
+		if sb.Len() == 0 {
+			sb.WriteString("invalid configuration:")
+		}
 		sb.WriteString("\n  ")
 		fmt.Fprintf(&sb, fieldErrMsg, fe.Namespace(), fe.Field(), fe.Tag(),
 			fe.Param())

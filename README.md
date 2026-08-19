@@ -102,6 +102,26 @@ testing.
 
   Test notification can be sent using `goimapotify test-notify`.
 
+* All excutable commands now configured using YAML lists, instead of strings
+
+  So instead of
+
+  ```yaml
+  onNewMail: "mbsync examplecom:INBOX"
+  ```
+
+  it should be
+
+  ```yaml
+  onNewMail: [ "mbsync", "examplecom:INBOX" ]
+  ```
+
+  In this case `mbsync` executed directly, without shell.
+
+  > ⚠️ For compatibility old way still works, but it isn't safe, because
+  > everything is executed through a shell and template variables are not shell
+  > escaped.
+
 ## Configuration
 
 This application is mostly compatible with the configuration of
@@ -125,41 +145,41 @@ configurations:
     xoAuth2: false
     boxes:
       - mailbox: INBOX
-        onNewMail: 'mbsync examplecom:INBOX'
-        onChangedMail: 'mbsync examplenet:INBOX'
-        onChangedMailPost: SKIP
-        onNewMailPost: SKIP
+        onNewMail: [ "mbsync", "examplecom:INBOX" ]
+        onChangedMail: [ "mbsync", "examplenet:INBOX" ]
+        onChangedMailPost: [ "SKIP" ]
+        onNewMailPost: [ "SKIP" ]
 
-  - hostCMD: COMMAND_TO_RETRIEVE_HOST
+  - hostCMD: [ "COMMAND_TO_RETRIEVE_HOST", "args" ]
     port: 993
     tls: true
     tlsOptions:
       rejectUnauthorized: true
       starttls: true
     username: ''
-    usernameCMD: ''
+    usernameCMD: []
     password: ''
-    passwordCMD: ''
+    passwordCMD: []
     xoAuth2: false
-    onNewMail: ''
-    onNewMailPost: ''
-    onChangedMail: ''
-    onChangedMailPost: ''
-    onDeletedMail: ''
-    onDeletedMailPost: ''
+    onNewMail: []
+    onNewMailPost: []
+    onChangedMail: []
+    onChangedMailPost: []
+    onDeletedMail: []
+    onDeletedMailPost: []
     boxes:
       - mailbox: INBOX
-        onNewMail: 'mbsync examplenet:INBOX'
-        onNewMailPost: SKIP
-        onChangedMail: 'mbsync examplenet:INBOX'
+        onNewMail: [ "mbsync", "examplenet:INBOX" ]
+        onNewMailPost: [ "SKIP" ]
+        onChangedMail: [ "mbsync", "examplenet:INBOX" ]
 
       - mailbox: Junk
-        onNewMail: 'mbsync examplenet:Junk'
-        onNewMailPost: SKIP
+        onNewMail: [ "mbsync", "examplenet:Junk" ]
+        onNewMailPost: [ "SKIP" ]
 ```
 
-On first start, the application will run `onNewMail` and `onNewMailPost` and
-then wait for events from your IMAP server.
+On first start, the application will run `onNewMail` and then wait for events
+from your IMAP server.
 
 - `onNewMail`: is an executable or script to run when new mail has arrived.
 
@@ -185,11 +205,9 @@ then wait for events from your IMAP server.
 - `passwordCMD`: is an executable or script that retrieves your password from
   somewhere, we cannot pass arguments to this command from `Stdin`.
 
-  > ⚠️ **Security**: Commands run via `passwordCMD`, `usernameCMD`, and `hostCMD`
-  > are executed through a shell (`sh -c`). Avoid embedding secrets literally in
-  > the command - use an external secret manager (e.g., `pass`, `gopass`,
-  > `oauth2l`) so credentials are not visible in the process list
-  > (`/proc/PID/cmdline`).
+  > ⚠️ **Security**: Avoid embedding secrets literally in the command - use an
+  > external secret manager (e.g., `pass`, `gopass`, `oauth2l`) so credentials
+  > are not visible in the process list (`/proc/PID/cmdline`).
 
 - `xoAuth2`: is an option that allow us to login on your IMAP using OAuth2, **be
   aware**: the token is retrieve from `passwordCMD` (see
@@ -214,11 +232,6 @@ capability. **Certificate verification is enabled by default** - set
 self-signed or untrusted certificate.
 
 To enable TLS connection, set `tls` as `true` and `starttls` as `false`
-
-> ⚠️ **Windows users**: On Windows, the `onNewMail`/`onChangedMail`/etc. command
-> strings use `cmd /c` for execution, and mailbox names substituted via `%s` are
-> **not** quoted. Avoid mailbox names containing shell metacharacters (`&`, `|`,
-> `;`, etc.).
 
 If your host do not offer IDLE, a sane default of checking every 15 minutes will
 take place instead.

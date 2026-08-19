@@ -150,12 +150,14 @@ func loadConfiguration(filename string) (*config.Configuration, error) {
 	}
 
 	for _, conf := range cfg.Configurations {
-		conf.RetrieveCmd()
-		if conf.Alias == "" {
-			conf.Alias = conf.Username
+		if err := conf.RetrieveCmd(); err != nil {
+			return nil, err
 		}
+
 		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 			conf.Alias = "<?>"
+		} else if conf.Alias == "" {
+			conf.Alias = conf.Username
 		}
 	}
 	return cfg, nil
@@ -166,7 +168,11 @@ func Run() error {
 		return listMailboxes(topConfig)
 	}
 
-	n, boxes, err := boxesFromConfig(topConfig.Configurations, flagRetries)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt,
+		syscall.SIGTERM)
+	defer stop()
+
+	n, boxes, err := boxesFromConfig(ctx, topConfig.Configurations, flagRetries)
 	if err != nil {
 		return fmt.Errorf("parse configurations: %w", err)
 	}
@@ -264,7 +270,7 @@ type accountBoxes struct {
 	Boxes []*box.Box
 }
 
-func boxesFromConfig(c []*config.NotifyConfig, retries int,
+func boxesFromConfig(ctx context.Context, c []*config.NotifyConfig, retries int,
 ) (int, []accountBoxes, error) {
 	var n int
 	ab := make([]accountBoxes, len(c))
@@ -272,12 +278,14 @@ func boxesFromConfig(c []*config.NotifyConfig, retries int,
 		configuredBoxes := accountConfig.Boxes
 		if len(configuredBoxes) == 0 {
 			// If there is no mailboxes, watch over all mailboxes of the account
-			boxes, err := boxesFromIMAP(accountConfig, retries)
-			if err != nil {
-				return 0, nil, fmt.Errorf(
-					"generate boxes configuration from IMAP: %w", err)
+			for mailbox, err := range remoteBoxes(ctx, accountConfig, retries) {
+				if err != nil {
+					return 0, nil, fmt.Errorf(
+						"generate boxes configuration, account=%s: %w",
+						accountConfig.Username, err)
+				}
+				configuredBoxes = append(configuredBoxes, &config.Box{Mailbox: mailbox})
 			}
-			configuredBoxes = boxes
 		}
 
 		boxes, err := box.CompileBoxes(accountConfig, configuredBoxes)

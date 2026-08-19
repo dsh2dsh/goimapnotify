@@ -1,12 +1,12 @@
 package box
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"strings"
-	"text/template"
+	"os/exec"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/config/command"
 )
 
 type Box struct {
@@ -15,137 +15,11 @@ type Box struct {
 	ExistingEmail uint32
 
 	account *config.NotifyConfig
-
-	templateNewMail         *template.Template
-	templateNewMailPost     *template.Template
-	templateChangedMail     *template.Template
-	templateChangedMailPost *template.Template
-	templateDeletedMail     *template.Template
-	templateDeletedMailPost *template.Template
-}
-
-func NewFromConfig(cfg *config.NotifyConfig) ([]*Box, error) {
-	return CompileBoxes(cfg, cfg.Boxes)
 }
 
 func CompileBoxes(accountConfig *config.NotifyConfig,
 	configuredBoxes []*config.Box,
 ) ([]*Box, error) {
-	accountBox := config.Box{
-		OnNewMail:         accountConfig.OnNewMail,
-		OnNewMailPost:     accountConfig.OnNewMailPost,
-		OnChangedMail:     accountConfig.OnChangedMail,
-		OnChangedMailPost: accountConfig.OnChangedMailPost,
-		OnDeletedMail:     accountConfig.OnDeletedMail,
-		OnDeletedMailPost: accountConfig.OnDeletedMailPost,
-	}
-	def := Box{Box: &accountBox}
-
-	if err := def.compileTemplates(&def); err != nil {
-		return nil, fmt.Errorf("parse commands: account=%s: %w",
-			accountConfig.Alias, err)
-	}
-
-	boxes := make([]*Box, 0, len(configuredBoxes))
-	for _, in := range configuredBoxes {
-		box := (&Box{Box: in}).WithAccount(accountConfig)
-		if err := box.compileTemplates(&def); err != nil {
-			return nil, fmt.Errorf("parse commands: account=%s, mailbox=%s: %w",
-				accountConfig.Alias, in.Mailbox, err)
-		}
-		boxes = append(boxes, box)
-	}
-	return boxes, nil
-}
-
-func (self *Box) compileTemplates(def *Box) error {
-	commands := []struct {
-		name            string
-		value           *string
-		template        *(*template.Template)
-		defaultValue    string
-		defaultTemplate *template.Template
-	}{
-		{
-			name:            "OnNewMail",
-			value:           &self.OnNewMail,
-			template:        &self.templateNewMail,
-			defaultValue:    def.OnNewMail,
-			defaultTemplate: def.templateNewMail,
-		},
-		{
-			name:            "OnNewMailPost",
-			value:           &self.OnNewMailPost,
-			template:        &self.templateNewMailPost,
-			defaultValue:    def.OnNewMailPost,
-			defaultTemplate: def.templateNewMailPost,
-		},
-		{
-			name:            "OnChangedMail",
-			value:           &self.OnChangedMail,
-			template:        &self.templateChangedMail,
-			defaultValue:    def.OnChangedMail,
-			defaultTemplate: def.templateChangedMail,
-		},
-		{
-			name:            "OnChangedMailPost",
-			value:           &self.OnChangedMailPost,
-			template:        &self.templateChangedMailPost,
-			defaultValue:    def.OnChangedMailPost,
-			defaultTemplate: def.templateChangedMailPost,
-		},
-		{
-			name:            "OnDeletedMail",
-			value:           &self.OnDeletedMail,
-			template:        &self.templateDeletedMail,
-			defaultValue:    def.OnDeletedMail,
-			defaultTemplate: def.templateDeletedMail,
-		},
-		{
-			name:            "OnDeletedMailPost",
-			value:           &self.OnDeletedMailPost,
-			template:        &self.templateDeletedMailPost,
-			defaultValue:    def.OnDeletedMailPost,
-			defaultTemplate: def.templateDeletedMailPost,
-		},
-	}
-
-	for _, c := range commands {
-		command := *c.value
-		if command == "" {
-			*c.value, *c.template = c.defaultValue, c.defaultTemplate
-			continue
-		} else if command == "SKIP" {
-			continue
-		}
-
-		t, err := compileTemplate(replaceMailboxPlaceholder(command))
-		if err != nil {
-			return fmt.Errorf("parse %s command: %w", c.name, err)
-		}
-		*c.template = t
-	}
-	return nil
-}
-
-func replaceMailboxPlaceholder(command string) string {
-	if command == "" {
-		return command
-	}
-	return strings.ReplaceAll(command, "%s", "{{ .Mailbox }}")
-}
-
-// compileTemplate tests that the string template is valid, if any was provided.
-func compileTemplate(s string) (*template.Template, error) {
-	if strings.TrimSpace(s) == "" {
-		return nil, nil
-	}
-
-	t, err := template.New("").Parse(s)
-	if err != nil {
-		return nil, fmt.Errorf("parse template: %w", err)
-	}
-
 	mailboxConfig := config.Box{Mailbox: "Inbox"}
 	notifyConfig := config.NotifyConfig{
 		Alias: "example@example.com",
@@ -154,10 +28,21 @@ func compileTemplate(s string) (*template.Template, error) {
 	box := Box{Box: &mailboxConfig}
 	data := IDLE{box: box.WithAccount(&notifyConfig)}
 
-	if err := t.Execute(io.Discard, &data); err != nil {
-		return nil, fmt.Errorf("exec template: %w", err)
+	if err := accountConfig.CompileTemplates(&data); err != nil {
+		return nil, fmt.Errorf("parse account commands: %s: %w",
+			accountConfig.Alias, err)
 	}
-	return t, nil
+
+	boxes := make([]*Box, len(configuredBoxes))
+	for i, in := range configuredBoxes {
+		if err := in.CompileTemplates(&data); err != nil {
+			return nil, fmt.Errorf(
+				"parse mailbox commands: account=%s, mailbox=%s: %w",
+				accountConfig.Alias, in.Mailbox, err)
+		}
+		boxes[i] = (&Box{Box: in}).WithAccount(accountConfig)
+	}
+	return boxes, nil
 }
 
 func (self *Box) WithAccount(account *config.NotifyConfig) *Box {
@@ -169,62 +54,105 @@ func (self *Box) Account() *config.NotifyConfig { return self.account }
 
 func (self *Box) Alias() string { return self.account.Alias }
 
-func (self *Box) SkipNewMail() bool { return self.templateNewMail == nil }
+func (self *Box) SkipNewMail() bool {
+	return self.OnNewMail() == nil || self.OnNewMail().Skip()
+}
+
+func (self *Box) OnNewMail() *command.Templated {
+	if self.Box.OnNewMail != nil {
+		return self.Box.OnNewMail
+	}
+	return self.account.OnNewMail
+}
+
+func (self *Box) OnNewMailPost() *command.Templated {
+	if self.Box.OnNewMailPost != nil {
+		return self.Box.OnNewMailPost
+	}
+	return self.account.OnNewMailPost
+}
 
 func (self *Box) SkipChangedMail() bool {
-	return self.templateChangedMail == nil
+	return self.OnChangedMail() == nil || self.OnChangedMail().Skip()
+}
+
+func (self *Box) OnChangedMail() *command.Templated {
+	if self.Box.OnChangedMail != nil {
+		return self.Box.OnChangedMail
+	}
+	return self.account.OnChangedMail
+}
+
+func (self *Box) OnChangedMailPost() *command.Templated {
+	if self.Box.OnChangedMailPost != nil {
+		return self.Box.OnChangedMailPost
+	}
+	return self.account.OnChangedMailPost
 }
 
 func (self *Box) SkipDeletedMail() bool {
-	return self.templateDeletedMail == nil
+	return self.OnDeletedMail() == nil || self.OnDeletedMail().Skip()
 }
 
-func (self *Box) RenderCommandTo(w io.Writer, e *IDLE) error {
-	return self.renderCommandTo(w, e, false)
-}
-
-func (self *Box) RenderPostCommandTo(w io.Writer, e *IDLE) error {
-	if e.Reason() == EventSync {
-		return nil
+func (self *Box) OnDeletedMail() *command.Templated {
+	if self.Box.OnDeletedMail != nil {
+		return self.Box.OnDeletedMail
 	}
-	return self.renderCommandTo(w, e, true)
+	return self.account.OnDeletedMail
 }
 
-func (self *Box) renderCommandTo(w io.Writer, e *IDLE, post bool) error {
-	var t *template.Template
+func (self *Box) OnDeletedMailPost() *command.Templated {
+	if self.Box.OnDeletedMailPost != nil {
+		return self.Box.OnDeletedMailPost
+	}
+	return self.account.OnDeletedMailPost
+}
+
+func (self *Box) Cmd(ctx context.Context, e *IDLE) (*exec.Cmd, error) {
+	return self.buildCmd(ctx, e, false)
+}
+
+func (self *Box) PostCmd(ctx context.Context, e *IDLE) (*exec.Cmd, error) {
+	if e.Reason() == EventSync {
+		return nil, nil
+	}
+	return self.buildCmd(ctx, e, true)
+}
+
+func (self *Box) buildCmd(ctx context.Context, e *IDLE, post bool,
+) (*exec.Cmd, error) {
+	var t *command.Templated
 	switch e.Reason() {
 	case EventSync, EventNewMail:
-		t = self.templateNewMail
+		t = self.OnNewMail()
 		if post {
-			t = self.templateNewMailPost
+			t = self.OnNewMailPost()
 		}
 	case EventDeletedMail:
-		t = self.templateDeletedMail
+		t = self.OnDeletedMail()
 		if post {
-			t = self.templateDeletedMailPost
+			t = self.OnDeletedMailPost()
 		}
 	case EventFlagChanged:
-		t = self.templateChangedMail
+		t = self.OnChangedMail()
 		if post {
-			t = self.templateChangedMailPost
+			t = self.OnChangedMailPost()
 		}
 	default:
-		return fmt.Errorf(
-			"template not found, unknown IDLE reason=%v, post=%v", e.Reason(), post)
+		return nil, fmt.Errorf(
+			"command not found, unknown IDLE reason=%v, post=%v", e.Reason(), post)
 	}
 
-	if t == nil {
-		return nil
+	if t == nil || t.Skip() {
+		return nil, nil
 	}
 
-	if err := t.Execute(w, e); err != nil {
-		var name string
+	cmd, err := t.Cmd(ctx, e)
+	if err != nil {
 		if post {
-			name = e.OnReasonPost()
-		} else {
-			name = e.OnReason()
+			return nil, fmt.Errorf("build %s command: %w", e.OnReasonPost(), err)
 		}
-		return fmt.Errorf("executing %s template: %w", name, err)
+		return nil, fmt.Errorf("build %s command: %w", e.OnReason(), err)
 	}
-	return nil
+	return cmd, nil
 }
