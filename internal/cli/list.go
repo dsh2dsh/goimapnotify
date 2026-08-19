@@ -1,14 +1,17 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
+	"github.com/dsh2dsh/goimapnotify/internal/jmap"
 )
 
 var listCmd = cobra.Command{
@@ -23,9 +26,22 @@ var listCmd = cobra.Command{
 
 func listMailboxes(topConfig *config.Configuration) error {
 	for _, account := range topConfig.Configurations {
-		boxes, err := imap.List(account, flagRetries)
-		if err != nil {
-			return err
+		var boxes *box.List
+
+		if account.JMAP {
+			l, err := jmap.List(context.Background(), account)
+			if err != nil {
+				return fmt.Errorf("listing JMAP mailboxes, account=%s: %w",
+					account.Alias, err)
+			}
+			boxes = l
+		} else {
+			l, err := imap.List(account, flagRetries)
+			if err != nil {
+				return fmt.Errorf("listing IMAP mailboxes, account=%s: %w",
+					account.Alias, err)
+			}
+			boxes = l
 		}
 
 		count := len(boxes.Boxes)

@@ -66,14 +66,15 @@ type ConfigurationLegacy struct {
 
 // NotifyConfig holds the configuration for a single account
 type NotifyConfig struct {
+	JMAP              bool               `yaml:"jmap"`
 	Host              string             `yaml:"host" validate:"required"`
 	HostCMD           *command.Templated `yaml:"hostCMD" validate:"omitnil,validateFn"`
-	Port              int                `yaml:"port" validate:"gt=0"`
+	Port              int                `yaml:"port" validate:"min=0"`
 	TLS               bool               `yaml:"tls"`
 	TLSOptions        TLSOptionsStruct   `yaml:"tlsOptions"`
 	IDLELogoutTimeout int                `yaml:"idleLogoutTimeout" validate:"min=0"`
 	EnableIDCommand   bool               `yaml:"enableIDCommand"`
-	Username          string             `yaml:"username"`
+	Username          string             `yaml:"username" validate:"required"`
 	UsernameCMD       *command.Templated `yaml:"usernameCMD" validate:"omitnil,validateFn"`
 	Alias             string             `yaml:"alias"`
 	Password          string             `yaml:"password"`

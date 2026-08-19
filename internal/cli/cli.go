@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -35,6 +36,7 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/cli/logger"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
+	"github.com/dsh2dsh/goimapnotify/internal/jmap"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
@@ -65,6 +67,7 @@ var Cmd = cobra.Command{
 func init() {
 	// Set the version for the imap package
 	imap.Version = gittag
+	jmap.Version = gittag
 
 	Cmd.PersistentFlags().StringVarP(&flagLogLevel, "log-level", "l", "info",
 		"change the logging level (error|warn|info|debug)")
@@ -183,10 +186,6 @@ func Run() error {
 		slog.String("branch", branch),
 		slog.Int("boxes", len(boxes)))
 
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
 	running := runner.New(n, time.Duration(flagWait)).
 		WithMaxDelay(topConfig.MaxDelay)
 	defer running.Close()
@@ -203,6 +202,9 @@ func Run() error {
 
 accountLoop:
 	for _, account := range boxes {
+		if account.JMAP {
+			return errors.New("JMAP support not yet implemented")
+		}
 		once := new(sync.Once)
 		for _, mailbox := range account.Boxes {
 			if ctx.Err() != nil {
@@ -298,32 +300,12 @@ func boxesFromConfig(ctx context.Context, c []*config.NotifyConfig, retries int,
 	return n, ab, nil
 }
 
-func boxesFromIMAP(account *config.NotifyConfig, retries int,
-) (boxes []*config.Box, _ error) {
-	c, err := imap.New(account, retries)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"account %q, failed to create IMAP client, error: %w",
-			account.Username, err,
-		)
+func remoteBoxes(ctx context.Context, account *config.NotifyConfig, retries int,
+) iter.Seq2[string, error] {
+	if account.JMAP {
+		return jmap.Mailboxes(ctx, account)
 	}
-	defer c.Close()
-
-mailboxLoop:
-	for mailbox, err := range imap.Mailboxes(c) {
-		if err != nil {
-			return nil, fmt.Errorf(
-				"failed to list all mailboxes, account=%s: %w", account.Username, err)
-		}
-		// Ignore mailboxes with attributes `\All` and `\Noselect`
-		for _, attr := range mailbox.Attrs {
-			if attr == "\\All" || attr == "\\Noselect" {
-				continue mailboxLoop
-			}
-		}
-		boxes = append(boxes, &config.Box{Mailbox: mailbox.Mailbox})
-	}
-	return boxes, nil
+	return imap.Mailboxes(account, retries)
 }
 
 func gracefulWait(wg *sync.WaitGroup, running *runner.Runner) {

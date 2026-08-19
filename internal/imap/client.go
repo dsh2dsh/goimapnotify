@@ -39,7 +39,7 @@ import (
 type option func(*imapclient.Options)
 
 // Version is set at build time
-var Version string = "unknown"
+var Version string = "dev"
 
 // New creates a new IMAP client with the given configuration.
 func New(conf *config.NotifyConfig, retries int, opts ...option,
