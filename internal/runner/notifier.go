@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"iter"
 	"log/slog"
 	"maps"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -91,7 +91,7 @@ func (self *notifier) notificationAction(sig *notify.ActionInvokedSignal) {
 	l.Info("got desktop notification action",
 		slog.Int64("running", self.running.Load()))
 
-	h := self.actionHandler(sig)
+	h, expired := self.actionHandler(sig)
 	if h == nil {
 		slog.Warn("unknown desktop notification action")
 		return
@@ -102,50 +102,76 @@ func (self *notifier) notificationAction(sig *notify.ActionInvokedSignal) {
 		h.OnAction(self.ctx, sig.ActionKey, self.actionTimeout)
 		self.running.Add(-1)
 	})
+
+	switch len(expired) {
+	case 0:
+		return
+	case 1:
+		self.closeNotifications(expired)
+		return
+	}
+	self.wg.Go(func() { self.closeNotifications(expired) })
 }
 
-func (self *notifier) actionHandler(sig *notify.ActionInvokedSignal) *handler {
+func (self *notifier) actionHandler(sig *notify.ActionInvokedSignal,
+) (*handler, []uint32) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
 	h, ok := self.handlers[sig.ID]
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	self.closeNotifications(h, sig)
-	return h
+	return h, self.expireNotifications(h, sig)
 }
 
-func (self *notifier) closeNotifications(h *handler,
+func (self *notifier) expireNotifications(h *handler,
 	sig *notify.ActionInvokedSignal,
-) {
-	var idSeq iter.Seq[uint32]
-	switch c := h.ActionConfig(sig.ActionKey); {
-	case c.CloseAll:
-		idSeq = maps.Keys(self.handlers)
-	case c.CloseSame:
-		idSeq = func(yield func(uint32) bool) {
-			for id, h2 := range self.handlers {
-				if h2 == h && !yield(id) {
-					return
-				}
-			}
-		}
-	case c.Close:
-		idSeq = func(yield func(uint32) bool) { yield(sig.ID) }
-	default:
-		delete(self.handlers, sig.ID)
-		return
+) (expired []uint32) {
+	c := h.ActionConfig(sig.ActionKey)
+	if c.CloseAll {
+		expired := slices.Collect(maps.Keys(self.handlers))
+		clear(self.handlers)
+		return expired
 	}
 
-	for id := range idSeq {
+	if c.CloseSame {
+		for id, sender := range self.handlers {
+			if sender == h {
+				expired = append(expired, id)
+				delete(self.handlers, id)
+			}
+		}
+		return expired
+	}
+
+	if c.Close {
+		delete(self.handlers, sig.ID)
+		return []uint32{sig.ID}
+	}
+	return nil
+}
+
+func (self *notifier) closeNotifications(expired []uint32) {
+	for i, id := range expired {
+		if self.ctx.Err() != nil {
+			slog.Error("stop closing desktop notifications",
+				slog.Int("expired", len(expired)),
+				slog.Int("index", i),
+				slog.Uint64("id", uint64(id)),
+				slog.Any("reason", self.ctx.Err()))
+			return
+		}
+
 		_, err := self.notifier.CloseNotification(id)
 		if err != nil {
 			slog.Error("unable close desktop notification",
-				slog.Uint64("id", uint64(id)), slog.Any("error", err))
-			break
+				slog.Int("expired", len(expired)),
+				slog.Int("index", i),
+				slog.Uint64("id", uint64(id)),
+				slog.Any("error", err))
+			return
 		}
-		delete(self.handlers, id)
 	}
 }
 
