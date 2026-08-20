@@ -277,5 +277,5 @@ Flags:
 Use "goimapnotify [command] --help" for more information about a command.
 ```
 
-As you can notice, `-list` can help you figure out the mailbox hierarchy of your
+As you can notice, `list` can help you figure out the mailbox hierarchy of your
 mail server.
