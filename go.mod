@@ -1,6 +1,6 @@
 module github.com/dsh2dsh/goimapnotify
 
-go 1.26
+go 1.27
 
 require (
 	git.sr.ht/~rockorager/go-jmap v0.5.3
