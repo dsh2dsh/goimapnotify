@@ -170,3 +170,16 @@ func (self *mailboxes) DeleteEmail(id jmap.ID) int {
 	delete(self.emails, id)
 	return len(self.emails)
 }
+
+func (self *mailboxes) UpdateEmail(m *email.Email) bool {
+	for id := range m.MailboxIDs {
+		mb := self.mailboxes[id]
+		if mb != nil && mb.Watching() != nil {
+			self.emails[m.ID] = m
+			return true
+		}
+	}
+
+	delete(self.emails, m.ID)
+	return false
+}

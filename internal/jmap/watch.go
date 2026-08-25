@@ -487,12 +487,12 @@ func (self *WatchMailboxes) processPing(b []byte) {
 	}
 
 	if err := json.Unmarshal(b, &ping); err != nil {
-		l.Warn("got invalid ping event", slog.Any("error", err))
+		l.Warn("invalid JMAP ping event", slog.Any("error", err))
 		return
 	}
 
 	d := time.Duration(ping.Interval) * time.Second
-	l.Info("got ping event", slog.Duration("interval", d))
+	l.Info("JMAP ping", slog.Duration("interval", d))
 	self.pingInterval = int(ping.Interval)
 }
 
@@ -673,15 +673,14 @@ func (self *WatchMailboxes) updatedMailboxes(emails []*email.Email) (deleted,
 
 		for id := range cached.MailboxIDs {
 			if !m.MailboxIDs[id] {
-				delete(cached.MailboxIDs, id)
 				deleted[id]++
 			}
 		}
 
 		for id := range m.MailboxIDs {
-			cached.MailboxIDs[id] = true
 			updated[id]++
 		}
+		self.jmapBoxes.UpdateEmail(m)
 	}
 	return deleted, updated
 }
