@@ -29,7 +29,7 @@ func listMailboxes(topConfig *config.Configuration) error {
 		var boxes *box.List
 
 		if account.JMAP {
-			l, err := jmap.List(context.Background(), account)
+			l, err := jmap.List(context.Background(), account, flagRetries)
 			if err != nil {
 				return fmt.Errorf("listing JMAP mailboxes, account=%s: %w",
 					account.Alias, err)

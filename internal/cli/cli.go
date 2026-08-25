@@ -202,9 +202,25 @@ func Run() error {
 
 accountLoop:
 	for _, account := range boxes {
-		if account.JMAP {
-			return errors.New("JMAP support not yet implemented")
+		if ctx.Err() != nil {
+			break
 		}
+
+		if account.JMAP {
+			wb := jmap.NewWatchMailboxes(account.Boxes, events).
+				WithStartupSync(topConfig.StartupSync)
+
+			if err := wb.Connect(ctx, flagRetries); err != nil {
+				slog.Error("Initial connection failed, skip all account mailboxes",
+					slog.String("account", account.Alias), slog.Any("error", err))
+				continue
+			}
+
+			watching++
+			wg.Go(func() { wb.Watch(ctx) })
+			continue
+		}
+
 		once := new(sync.Once)
 		for _, mailbox := range account.Boxes {
 			if ctx.Err() != nil {
@@ -303,7 +319,7 @@ func boxesFromConfig(ctx context.Context, c []*config.NotifyConfig, retries int,
 func remoteBoxes(ctx context.Context, account *config.NotifyConfig, retries int,
 ) iter.Seq2[string, error] {
 	if account.JMAP {
-		return jmap.Mailboxes(ctx, account)
+		return jmap.Mailboxes(ctx, account, retries)
 	}
 	return imap.Mailboxes(account, retries)
 }

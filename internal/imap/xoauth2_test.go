@@ -17,9 +17,11 @@ package imap
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import (
-	"encoding/json"
-	"errors"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewXoauth2Client(t *testing.T) {
@@ -103,44 +105,38 @@ func TestXoauth2Client_Start(t *testing.T) {
 
 func TestXoauth2Client_Next(t *testing.T) {
 	tests := []struct {
-		name        string
-		challenge   []byte
-		wantErr     bool
-		wantErrType error // nil means we expect Xoauth2Error
+		name      string
+		challenge []byte
+		wantErr   any
 	}{
 		{
 			name: "valid error response",
 			challenge: []byte(
 				`{"status":"401","schemes":"Bearer","scope":"https://mail.google.com/"}`,
 			),
-			wantErr:     true,
-			wantErrType: nil, // Xoauth2Error
+			wantErr: &Xoauth2Error{},
 		},
 		{
 			name: "error response with different status",
 			challenge: []byte(
 				`{"status":"403","schemes":"Bearer","scope":"https://mail.google.com/"}`,
 			),
-			wantErr:     true,
-			wantErrType: nil, // Xoauth2Error
+			wantErr: &Xoauth2Error{},
 		},
 		{
-			name:        "empty JSON object",
-			challenge:   []byte(`{}`),
-			wantErr:     true,
-			wantErrType: nil, // Xoauth2Error with empty fields
+			name:      "empty JSON object",
+			challenge: []byte(`{}`),
+			wantErr:   &Xoauth2Error{},
 		},
 		{
-			name:        "invalid JSON",
-			challenge:   []byte(`not valid json`),
-			wantErr:     true,
-			wantErrType: &json.SyntaxError{}, // JSON parse error
+			name:      "invalid JSON",
+			challenge: []byte(`not valid json`),
+			wantErr:   &jsontext.SyntacticError{}, // JSON parse error
 		},
 		{
-			name:        "empty challenge",
-			challenge:   []byte(``),
-			wantErr:     true,
-			wantErrType: &json.SyntaxError{}, // JSON parse error
+			name:      "empty challenge",
+			challenge: []byte(``),
+			wantErr:   &jsontext.SyntacticError{}, // JSON parse error
 		},
 	}
 
@@ -148,30 +144,23 @@ func TestXoauth2Client_Next(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := NewXoauth2Client("user@example.com", "token123")
 			// Call Start first as required by SASL protocol
-			_, _, _ = client.Start()
+			_, _, err := client.Start()
+			require.NoError(t, err)
 
 			resp, err := client.Next(tt.challenge)
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Next() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				switch v := tt.wantErr.(type) {
+				case *Xoauth2Error:
+					require.ErrorAs(t, err, &v)
+				case *jsontext.SyntacticError:
+					require.ErrorAs(t, err, &v)
+				default:
+					t.Errorf("Unrecognized error type: %T", err)
+				}
 				return
 			}
-
-			if resp != nil {
-				t.Errorf("Next() response = %v, want nil", resp)
-			}
-
-			if tt.wantErrType == nil {
-				// Expect Xoauth2Error
-				if _, ok := errors.AsType[*Xoauth2Error](err); !ok {
-					t.Errorf("Next() error type = %T, want *Xoauth2Error", err)
-				}
-			} else {
-				// Expect JSON error
-				if _, ok := errors.AsType[*json.SyntaxError](err); !ok {
-					t.Errorf("Next() error type = %T, want *json.SyntaxError", err)
-				}
-			}
+			require.NotNil(t, resp)
 		})
 	}
 }

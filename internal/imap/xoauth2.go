@@ -23,7 +23,7 @@ package imap
 // SOFTWARE.
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 
 	"github.com/emersion/go-sasl"
