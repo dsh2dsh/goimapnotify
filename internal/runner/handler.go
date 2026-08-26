@@ -165,7 +165,7 @@ func (self *handler) notify(output []byte) {
 	l := slog.With(
 		slog.String("alias", self.box.Alias()),
 		slog.String("mailbox", self.box.Mailbox))
-	l.Info("send desktop notification")
+	l.Debug("send desktop notification")
 
 	if err := self.notifier.Send(n, self, l); err != nil {
 		printCommandOutput(slog.LevelInfo, "stdout: ", output)
