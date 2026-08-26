@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -29,7 +30,7 @@ type Configuration struct {
 	MaxDelay       time.Duration       `yaml:"maxDelay" validate:"gt=0"`
 	StartupSync    bool                `yaml:"startupSync"`
 	DesktopNotify  DesktopNotification `yaml:"desktopNotify"`
-	Configurations []*NotifyConfig     `yaml:"configurations" validate:"gt=0,dive,required"`
+	Configurations []*NotifyConfig     `yaml:"configurations" validate:"gt=0,dive,required,validateFn"`
 }
 
 type DesktopNotification struct {
@@ -133,6 +134,16 @@ func (self *NotifyConfig) CompileTemplates(data any) error {
 		if err := b.CompileTemplates(data); err != nil {
 			return fmt.Errorf("compile mailbox templates: %s: %w", b.Mailbox, err)
 		}
+	}
+	return nil
+}
+
+func (self *NotifyConfig) Validate() error {
+	switch {
+	case self.JMAP:
+		return nil
+	case self.Host == "":
+		return errors.New("host not configured")
 	}
 	return nil
 }
