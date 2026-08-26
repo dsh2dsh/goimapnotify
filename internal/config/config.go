@@ -67,6 +67,7 @@ type ConfigurationLegacy struct {
 // NotifyConfig holds the configuration for a single account
 type NotifyConfig struct {
 	JMAP              bool               `yaml:"jmap"`
+	Ping              *int               `yaml:"ping"`
 	Host              string             `yaml:"host" validate:"required"`
 	HostCMD           *command.Templated `yaml:"hostCMD" validate:"omitnil,validateFn"`
 	Port              int                `yaml:"port" validate:"min=0"`

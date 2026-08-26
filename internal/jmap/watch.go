@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"git.sr.ht/~rockorager/go-jmap"
@@ -36,21 +37,32 @@ type WatchMailboxes struct {
 	client *client
 	events chan<- *box.IDLE
 
-	jmapBoxes    *mailboxes
-	eventSource  string
-	lastEventId  string
-	retryDelay   time.Duration
-	pingInterval int
-	emailState   string
+	jmapBoxes   *mailboxes
+	eventSource string
+	lastEventId string
+	retryDelay  time.Duration
+	emailState  string
+
+	pingInterval   int
+	watchdogTicker *time.Ticker
+	stopWatchdog   func()
 }
 
 func NewWatchMailboxes(boxes []*box.Box, events chan<- *box.IDLE,
 ) *WatchMailboxes {
-	return &WatchMailboxes{
+	return (&WatchMailboxes{
 		boxes:        boxes,
 		events:       events,
 		pingInterval: pingInterval,
+	}).init()
+}
+
+func (self *WatchMailboxes) init() *WatchMailboxes {
+	cfg := self.accountConfig()
+	if cfg.Ping != nil && *cfg.Ping >= 0 {
+		self.pingInterval = *cfg.Ping
 	}
+	return self
 }
 
 func (self *WatchMailboxes) WithStartupSync(v bool) *WatchMailboxes {
@@ -324,9 +336,13 @@ func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
 }
 
 func (self *WatchMailboxes) watch(ctx context.Context) bool {
+	watchdog, stopWatchdog := context.WithCancel(ctx)
+	self.stopWatchdog = stopWatchdog
+	defer self.stopWatchdog()
+
 	l := slog.With(slog.String("account", self.accountConfig().Alias))
 	for {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		req, err := http.NewRequestWithContext(watchdog, http.MethodGet,
 			self.eventSource, nil)
 		if err != nil {
 			l.Error("unable build event source request",
@@ -385,13 +401,18 @@ func (self *WatchMailboxes) listen(req *http.Request,
 		slog.Info("listen for events from event source",
 			slog.String("account", self.accountConfig().Alias),
 			slog.String("url", self.eventSource))
-		self.readEvents(resp.Body, yield)
+		self.readEvents(req.Context(), resp.Body, yield)
 	}
 }
 
-func (self *WatchMailboxes) readEvents(r io.Reader,
+func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 	yield func(*jmap.StateChange, error) bool,
 ) {
+	var wg sync.WaitGroup
+	if self.pingInterval > 0 {
+		defer self.startWatchdog(ctx, &wg)()
+	}
+
 	var b bytes.Buffer
 	var eventType string
 	var stateChange jmap.StateChange
@@ -451,6 +472,39 @@ func (self *WatchMailboxes) readEvents(r io.Reader,
 	}
 }
 
+func (self *WatchMailboxes) startWatchdog(ctx context.Context,
+	wg *sync.WaitGroup,
+) (deferFunc func()) {
+	d := self.watchdogInterval()
+	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l.Info("start ping watchdog", slog.Duration("timeout", d))
+
+	self.watchdogTicker = time.NewTicker(d)
+	wg.Go(func() { self.watchdog(ctx) })
+
+	return func() {
+		self.stopWatchdog()
+		l.Info("wait for watchdog goroutine to stop...")
+		wg.Wait()
+	}
+}
+
+func (self *WatchMailboxes) watchdogInterval() time.Duration {
+	return time.Duration(self.pingInterval)*time.Second + time.Minute
+}
+
+func (self *WatchMailboxes) watchdog(ctx context.Context) {
+	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	select {
+	case <-ctx.Done():
+		self.watchdogTicker.Stop()
+		l.Info("ping watchdog stopped", slog.Any("reason", ctx.Err()))
+	case <-self.watchdogTicker.C:
+		self.stopWatchdog()
+		l.Info("ping watchdog timed out, reconnect to event source")
+	}
+}
+
 func (self *WatchMailboxes) dispatchEvent(eventType string, b *bytes.Buffer,
 	stateChange *jmap.StateChange, yield func(*jmap.StateChange, error) bool,
 ) bool {
@@ -491,9 +545,12 @@ func (self *WatchMailboxes) processPing(b []byte) {
 		return
 	}
 
-	d := time.Duration(ping.Interval) * time.Second
-	l.Info("JMAP ping", slog.Duration("interval", d))
 	self.pingInterval = int(ping.Interval)
+	timeout := self.watchdogInterval()
+	l.Info("JMAP ping, reset watchdog",
+		slog.Duration("interval", time.Duration(self.pingInterval)*time.Second),
+		slog.Duration("timeout", timeout))
+	self.watchdogTicker.Reset(timeout)
 }
 
 func (self *WatchMailboxes) processIdField(b []byte) {
