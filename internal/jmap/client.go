@@ -3,7 +3,6 @@ package jmap
 import (
 	"context"
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,14 +25,16 @@ var httpClient = &http.Client{
 type client struct {
 	*jmap.Client
 
-	timeout time.Duration
+	username string
+	timeout  time.Duration
 }
 
 func New(ctx context.Context, conf *config.NotifyConfig, retries int,
 ) (_ *client, err error) {
 	c := (&client{
-		Client:  &jmap.Client{SessionEndpoint: conf.Host},
-		timeout: timeout,
+		Client:   &jmap.Client{SessionEndpoint: conf.Host},
+		username: conf.Username,
+		timeout:  timeout,
 	}).withAccessToken(ctx, conf.Password)
 
 	if err := c.retryAuth(ctx, retries); err != nil {
@@ -56,7 +57,7 @@ authLoop:
 		switch err = self.authenticate(ctx); {
 		case err == nil:
 			return nil
-		case wait == retries-1, errors.Is(err, ErrLoginFailed), ctx.Err() != nil:
+		case wait == retries-1, ctx.Err() != nil, unableWatch(err):
 			break authLoop
 		}
 
@@ -78,6 +79,19 @@ authLoop:
 func (self *client) authenticate(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, self.timeout)
 	defer cancel()
+
+	if self.SessionEndpoint == "" {
+		s, err := autoDiscovery(ctx, self.username)
+		if err != nil {
+			return fmt.Errorf("%w: autodiscovery session endpoint: %w",
+				ErrUnableWatch, err)
+		}
+		self.SessionEndpoint = s
+	}
+
+	if self.SessionEndpoint == "" {
+		return fmt.Errorf("%w: session endpoint not configured", ErrUnableWatch)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		self.SessionEndpoint, nil)

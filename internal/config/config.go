@@ -68,7 +68,7 @@ type ConfigurationLegacy struct {
 type NotifyConfig struct {
 	JMAP              bool               `yaml:"jmap"`
 	Ping              *int               `yaml:"ping"`
-	Host              string             `yaml:"host" validate:"required"`
+	Host              string             `yaml:"host"`
 	HostCMD           *command.Templated `yaml:"hostCMD" validate:"omitnil,validateFn"`
 	Port              int                `yaml:"port" validate:"min=0"`
 	TLS               bool               `yaml:"tls"`
