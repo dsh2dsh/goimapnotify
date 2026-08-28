@@ -545,9 +545,19 @@ func (self *WatchMailboxes) processPing(b []byte) {
 		return
 	}
 
-	self.pingInterval = int(ping.Interval)
+	v := int(ping.Interval)
+	changed := self.pingInterval != v
+	self.pingInterval = v
 	timeout := self.watchdogInterval()
-	l.Info("JMAP ping, reset watchdog",
+
+	if changed {
+		l.Info("JMAP ping interval changed",
+			slog.Duration("interval",
+				time.Duration(self.pingInterval)*time.Second),
+			slog.Duration("timeout", timeout))
+	}
+
+	l.Debug("JMAP ping, reset watchdog",
 		slog.Duration("interval", time.Duration(self.pingInterval)*time.Second),
 		slog.Duration("timeout", timeout))
 	self.watchdogTicker.Reset(timeout)
