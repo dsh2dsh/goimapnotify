@@ -122,6 +122,26 @@ testing.
   > everything is executed through a shell and template variables are not shell
   > escaped.
 
+* JMAP support
+
+  Instead of IMAP, JMAP can be used:
+
+  ```yaml
+  configurations:
+    - username: "username@fastmail.com"
+      password: "long-and-secret-api-token"
+      jmap: true
+      ping: 300 # default
+  ```
+
+  If you uses Fastmail, you can generate your API token in settings. Go to
+  `Settings`, `Privacy & Security`, `Manage API tokens`. Click `New API token`
+  and set `Type`: `JMAP` and `Read-only access`, `Scopes`: `Email`. Finally
+  click `Generate API token`. Use generated API token as `password`.
+
+  `ping` defines keep-alive interval in seconds. How often server will send ping
+  events. Default value is 5 minutes and usually you don't need this option.
+
 ## Configuration
 
 This application is mostly compatible with the configuration of
