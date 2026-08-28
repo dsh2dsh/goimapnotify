@@ -1,8 +1,8 @@
 goimapnotify
 ============
 
-Execute scripts on IMAP mailbox changes (new/deleted/updated messages) using
-IDLE, Golang version.
+Execute scripts on IMAP or JAMP mailbox changes (new/deleted/updated messages),
+Go version.
 
 This project is a fork of
 [goimapnotify](https://gitlab.com/shackra/goimapnotify).
@@ -38,10 +38,10 @@ testing.
 
 * Configurable max delay
 
-  Every next IDLE event delays execution of commands for this mailbox. With
-  stream of many events this delay is increasing and increasing, until it
-  reaches `maxDelay`, which is 5 minutes by default. After that all commands
-  executed. The limit can be configured by top level option
+  Every next event delays execution of commands for this mailbox. With stream of
+  many events this delay is increasing and increasing, until it reaches
+  `maxDelay`, which is 5 minutes by default. After that all commands executed.
+  The limit can be configured by top level option
 
   ```yaml
   maxDelay: "10m"
@@ -199,7 +199,7 @@ configurations:
 ```
 
 On first start, the application will run `onNewMail` and then wait for events
-from your IMAP server.
+from your IMAP or JMAP server.
 
 - `onNewMail`: is an executable or script to run when new mail has arrived.
 
@@ -253,8 +253,8 @@ self-signed or untrusted certificate.
 
 To enable TLS connection, set `tls` as `true` and `starttls` as `false`
 
-If your host do not offer IDLE, a sane default of checking every 15 minutes will
-take place instead.
+If your host do not offer IMAP IDLE, a sane default of checking every 15 minutes
+will take place instead.
 
 You can also use xoAuth2 instead of password based authentication by setting the
 `xoAuth2` option to `true` and the output of a tool which can provide xoAuth2
@@ -273,7 +273,7 @@ go install github.com/dsh2dsh/goimapnotify@latest
 ## Usage
 
 ```
-goimapnotify executes scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE.
+goimapnotify executes scripts on IMAP (using IDLE) or JMAP mailbox changes (new/deleted/updated messages).
 
 Usage:
   goimapnotify [flags]

@@ -55,7 +55,7 @@ var (
 
 var Cmd = cobra.Command{
 	Use:     "goimapnotify",
-	Short:   "goimapnotify executes scripts on IMAP mailbox changes (new/deleted/updated messages) using IDLE.",
+	Short:   "goimapnotify executes scripts on IMAP (using IDLE) or JMAP mailbox changes (new/deleted/updated messages).",
 	Args:    cobra.ExactArgs(0),
 	Version: gittag,
 
@@ -76,7 +76,7 @@ func init() {
 		"delay in seconds between the IDLE event and the execution of the scripts")
 
 	Cmd.PersistentFlags().IntVarP(&flagRetries, "dial-retry-attempts", "r", 5,
-		"number of attempts when connecting to an IMAP server, using exponential backoff")
+		"number of attempts when connecting to a server, using exponential backoff")
 
 	if logger.HasSyslog() {
 		Cmd.PersistentFlags().BoolVarP(&flagSyslog, "syslog", "s", false,
