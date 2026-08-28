@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"git.sr.ht/~rockorager/go-jmap"
@@ -33,19 +34,22 @@ type WatchMailboxes struct {
 	boxes       []*box.Box
 	retries     int
 	startupSync bool
+	events      chan<- *box.IDLE
 
-	client *client
-	events chan<- *box.IDLE
-
+	client      *client
 	jmapBoxes   *mailboxes
 	eventSource string
 	lastEventId string
 	retryDelay  time.Duration
-	emailState  string
 
 	pingInterval   int
 	watchdogTicker *time.Ticker
 	stopWatchdog   func()
+
+	wg            sync.WaitGroup
+	emailState    string
+	lastState     atomic.Value
+	wakeupFetcher chan struct{}
 }
 
 func NewWatchMailboxes(boxes []*box.Box, events chan<- *box.IDLE,
@@ -70,6 +74,11 @@ func (self *WatchMailboxes) WithStartupSync(v bool) *WatchMailboxes {
 	return self
 }
 
+func (self *WatchMailboxes) logger() *slog.Logger {
+	return slog.With(
+		slog.String("account", self.accountConfig().Alias))
+}
+
 func (self *WatchMailboxes) Connect(ctx context.Context, retries int) error {
 	self.retries = retries
 
@@ -78,8 +87,7 @@ func (self *WatchMailboxes) Connect(ctx context.Context, retries int) error {
 			return err
 		}
 
-		slog.Error("Initial connection failed, retrying in background",
-			slog.String("account", self.accountConfig().Alias),
+		self.logger().Error("Initial connection failed, retrying in background",
 			slog.Any("error", err))
 		return nil
 	}
@@ -116,8 +124,7 @@ func (self *WatchMailboxes) initEventSource() {
 
 func (self *WatchMailboxes) printConnected() {
 	jmapAccount := self.client.Account()
-	l := slog.With(
-		slog.String("account", self.accountConfig().Alias),
+	l := self.logger().With(
 		slog.String("name", jmapAccount.Name),
 		slog.Bool("personal", jmapAccount.IsPersonal),
 		slog.Bool("readOnly", jmapAccount.IsReadOnly))
@@ -150,7 +157,7 @@ func (self *WatchMailboxes) initMailboxes(ctx context.Context) error {
 		return fmt.Errorf("%w: no mailboxes found on server", ErrUnableWatch)
 	}
 
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l := self.logger()
 	l.Info("got list of all mailboxes", slog.Int("count", jmapBoxes.Len()))
 
 	for _, b := range self.boxes {
@@ -171,7 +178,7 @@ func (self *WatchMailboxes) initMailboxes(ctx context.Context) error {
 }
 
 func (self *WatchMailboxes) queryEmails(ctx context.Context) error {
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l := self.logger()
 	l.Debug("query all Emails from watched mailboxes")
 
 	var emailsCount int
@@ -253,6 +260,9 @@ func (self *WatchMailboxes) queryEmails(ctx context.Context) error {
 }
 
 func (self *WatchMailboxes) Watch(ctx context.Context) {
+	self.wakeupFetcher = make(chan struct{}, 1)
+	self.wg.Go(func() { self.fetcher(ctx) })
+
 	for self.reconnect(ctx) {
 		if ctx.Err() != nil {
 			break
@@ -263,13 +273,20 @@ func (self *WatchMailboxes) Watch(ctx context.Context) {
 		if ok := self.watch(ctx); !ok || ctx.Err() != nil {
 			break
 		}
-		self.Close()
+		self.client = nil
 	}
 
 	if ctx.Err() == nil {
 		self.sendEvent(ctx, self.boxes[0], box.StopWatching)
 	}
-	self.Close()
+	self.close()
+}
+
+func (self *WatchMailboxes) close() {
+	close(self.wakeupFetcher)
+
+	self.logger().Info("waiting fetcher goroutine to stop...")
+	self.wg.Wait()
 }
 
 func (self *WatchMailboxes) sendEvent(ctx context.Context, b *box.Box,
@@ -314,16 +331,12 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 	}
 }
 
-func (self *WatchMailboxes) Close() {
-	self.client = nil
-}
-
 func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
 	if !self.startupSync {
 		return
 	}
 
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l := self.logger()
 
 	for _, m := range self.jmapBoxes.Watching() {
 		b := m.Watching()
@@ -340,7 +353,8 @@ func (self *WatchMailboxes) watch(ctx context.Context) bool {
 	self.stopWatchdog = stopWatchdog
 	defer self.stopWatchdog()
 
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l := self.logger()
+
 	for {
 		req, err := http.NewRequestWithContext(watchdog, http.MethodGet,
 			self.eventSource, nil)
@@ -358,7 +372,7 @@ func (self *WatchMailboxes) watch(ctx context.Context) bool {
 			} else if stateChange.Type != "StateChange" {
 				continue
 			}
-			self.stateChanged(ctx, stateChange)
+			self.stateChanged(stateChange)
 		}
 
 		if ctx.Err() != nil {
@@ -398,8 +412,7 @@ func (self *WatchMailboxes) listen(req *http.Request,
 			return
 		}
 
-		slog.Info("listen for events from event source",
-			slog.String("account", self.accountConfig().Alias),
+		self.logger().Info("listen for events from event source",
 			slog.String("url", self.eventSource))
 		self.readEvents(req.Context(), resp.Body, yield)
 	}
@@ -408,9 +421,8 @@ func (self *WatchMailboxes) listen(req *http.Request,
 func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 	yield func(*jmap.StateChange, error) bool,
 ) {
-	var wg sync.WaitGroup
 	if self.pingInterval > 0 {
-		defer self.startWatchdog(ctx, &wg)()
+		defer self.startWatchdog(ctx)()
 	}
 
 	var b bytes.Buffer
@@ -473,18 +485,18 @@ func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 }
 
 func (self *WatchMailboxes) startWatchdog(ctx context.Context,
-	wg *sync.WaitGroup,
 ) (deferFunc func()) {
 	d := self.watchdogInterval()
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l := self.logger()
 	l.Info("start ping watchdog", slog.Duration("timeout", d))
 
 	self.watchdogTicker = time.NewTicker(d)
+	wg := new(sync.WaitGroup)
 	wg.Go(func() { self.watchdog(ctx) })
 
 	return func() {
 		self.stopWatchdog()
-		l.Info("wait for watchdog goroutine to stop...")
+		l.Info("waiting watchdog goroutine to stop...")
 		wg.Wait()
 	}
 }
@@ -494,14 +506,13 @@ func (self *WatchMailboxes) watchdogInterval() time.Duration {
 }
 
 func (self *WatchMailboxes) watchdog(ctx context.Context) {
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
 	select {
 	case <-ctx.Done():
 		self.watchdogTicker.Stop()
-		l.Info("ping watchdog stopped", slog.Any("reason", ctx.Err()))
+		self.logger().Info("ping watchdog stopped", slog.Any("reason", ctx.Err()))
 	case <-self.watchdogTicker.C:
 		self.stopWatchdog()
-		l.Info("ping watchdog timed out, reconnect to event source")
+		self.logger().Info("ping watchdog timed out, reconnect to event source")
 	}
 }
 
@@ -535,7 +546,7 @@ func (self *WatchMailboxes) dispatchEvent(eventType string, b *bytes.Buffer,
 }
 
 func (self *WatchMailboxes) processPing(b []byte) {
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
+	l := self.logger()
 	var ping struct {
 		Interval uint32 `json:"interval"`
 	}
@@ -552,8 +563,7 @@ func (self *WatchMailboxes) processPing(b []byte) {
 
 	if changed {
 		l.Info("JMAP ping interval changed",
-			slog.Duration("interval",
-				time.Duration(self.pingInterval)*time.Second),
+			slog.Duration("interval", time.Duration(self.pingInterval)*time.Second),
 			slog.Duration("timeout", timeout))
 	}
 
@@ -576,36 +586,22 @@ func (self *WatchMailboxes) processRetryField(val string) {
 	}
 
 	self.retryDelay = time.Duration(ms) * time.Millisecond
-	slog.Info("got retry event",
-		slog.String("account", self.accountConfig().Alias),
+	self.logger().Info("got retry event",
 		slog.Duration("retryDelay", self.retryDelay))
 }
 
-func (self *WatchMailboxes) stateChanged(ctx context.Context,
-	stateChange *jmap.StateChange,
-) {
+func (self *WatchMailboxes) stateChanged(stateChange *jmap.StateChange) {
 	state := self.changedEmailState(stateChange)
 	if state == "" {
 		return
 	}
 
-	l := slog.With(slog.String("account", self.accountConfig().Alias))
-	if self.emailState == "" || self.emailState == state {
-		self.emailState = state
-		l.Debug("got current Email state", slog.String("state", state))
-		return
-	}
-	l.Debug("got Email state change", slog.String("state", state))
+	self.logger().Debug("got Email state change", slog.String("state", state))
+	self.lastState.Store(state)
 
-	for {
-		hasMore, err := self.fetchEmailChanges(ctx)
-		if err != nil {
-			l.Error("unable fetch Email changes",
-				slog.String("sinceState", self.emailState), slog.Any("error", err))
-		}
-		if !hasMore {
-			break
-		}
+	select {
+	case self.wakeupFetcher <- struct{}{}:
+	default:
 	}
 }
 
@@ -616,6 +612,42 @@ func (self *WatchMailboxes) changedEmailState(stateChange *jmap.StateChange,
 		return changed[string(mail.EmailEvent)]
 	}
 	return ""
+}
+
+func (self *WatchMailboxes) fetcher(ctx context.Context) {
+	l := self.logger()
+	l.Info("start background Email fetcher")
+
+fetcherLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			l.Info("Email fetcher stopped", slog.Any("reason", ctx.Err()))
+			return
+		case _, ok := <-self.wakeupFetcher:
+			if !ok {
+				l.Info("Email fetcher stopped by signal")
+				return
+			}
+
+			state := self.lastState.Load().(string)
+			if self.emailState == state {
+				l.Debug("fetcher reached last known state", slog.String("state", state))
+				continue fetcherLoop
+			}
+		}
+
+		for {
+			hasMore, err := self.fetchEmailChanges(ctx)
+			if err != nil {
+				l.Error("unable fetch Email changes",
+					slog.String("sinceState", self.emailState), slog.Any("error", err))
+				continue fetcherLoop
+			} else if !hasMore {
+				continue fetcherLoop
+			}
+		}
+	}
 }
 
 func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
@@ -650,8 +682,7 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 			resp.Responses[0].Args)
 	}
 
-	slog.Debug("got Email changes",
-		slog.String("account", self.accountConfig().Alias),
+	self.logger().Debug("got Email changes",
 		slog.String("oldState", r.OldState),
 		slog.String("newState", r.NewState),
 		slog.Any("created", r.Created),
@@ -771,6 +802,7 @@ func (self *WatchMailboxes) notifyDeleted(ctx context.Context, ids []jmap.ID,
 func (self *WatchMailboxes) syncMailboxes(ctx context.Context,
 	mailboxes map[jmap.ID]int, event box.EventType,
 ) error {
+	l := self.logger()
 	for id, count := range mailboxes {
 		mb := self.jmapBoxes.Mailbox(id)
 		if mb == nil {
@@ -782,8 +814,7 @@ func (self *WatchMailboxes) syncMailboxes(ctx context.Context,
 			continue
 		}
 
-		slog.Info("send Email change",
-			slog.String("account", self.accountConfig().Alias),
+		l.Info("send Email change",
 			slog.String("event", event.String()),
 			slog.String("mailbox", mb.Path()),
 			slog.Int("count", count))
