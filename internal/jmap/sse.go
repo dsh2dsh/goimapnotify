@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"git.sr.ht/~rockorager/go-jmap"
+
+	"github.com/dsh2dsh/goimapnotify/internal/logging"
 )
 
 func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
@@ -32,7 +34,7 @@ func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 
 		// Handle blank line (dispatch event)
 		if len(line) == 0 {
-			if !self.dispatchEvent(eventType, &b, &stateChange, yield) {
+			if !self.dispatchEvent(ctx, eventType, &b, &stateChange, yield) {
 				return
 			}
 			eventType = ""
@@ -68,7 +70,7 @@ func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 		case "id":
 			self.processIdField(val)
 		case "retry":
-			self.processRetryField(string(val))
+			self.processRetryField(ctx, string(val))
 		}
 	}
 
@@ -81,8 +83,9 @@ func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 	}
 }
 
-func (self *WatchMailboxes) dispatchEvent(eventType string, b *bytes.Buffer,
-	stateChange *jmap.StateChange, yield func(*jmap.StateChange, error) bool,
+func (self *WatchMailboxes) dispatchEvent(ctx context.Context, eventType string,
+	b *bytes.Buffer, stateChange *jmap.StateChange,
+	yield func(*jmap.StateChange, error) bool,
 ) bool {
 	if b.Len() == 0 {
 		return true
@@ -91,7 +94,7 @@ func (self *WatchMailboxes) dispatchEvent(eventType string, b *bytes.Buffer,
 
 	switch eventType {
 	case "ping":
-		self.processPing(b.Bytes())
+		self.processPing(ctx, b.Bytes())
 		return true
 	case "state":
 	default:
@@ -110,8 +113,8 @@ func (self *WatchMailboxes) dispatchEvent(eventType string, b *bytes.Buffer,
 	return true
 }
 
-func (self *WatchMailboxes) processPing(b []byte) {
-	l := self.logger()
+func (self *WatchMailboxes) processPing(ctx context.Context, b []byte) {
+	l := logging.FromContext(ctx)
 	var ping struct {
 		Interval uint32 `json:"interval"`
 	}
@@ -144,13 +147,13 @@ func (self *WatchMailboxes) processIdField(b []byte) {
 	}
 }
 
-func (self *WatchMailboxes) processRetryField(val string) {
+func (self *WatchMailboxes) processRetryField(ctx context.Context, val string) {
 	ms, err := strconv.Atoi(val)
 	if err != nil || ms <= 0 {
 		return
 	}
 
 	self.retryDelay = time.Duration(ms) * time.Millisecond
-	self.logger().Info("got retry event",
+	logging.FromContext(ctx).Info("got retry event",
 		slog.Duration("retryDelay", self.retryDelay))
 }

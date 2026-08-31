@@ -37,6 +37,7 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/jmap"
+	"github.com/dsh2dsh/goimapnotify/internal/logging"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
@@ -210,9 +211,12 @@ accountLoop:
 			wb := jmap.NewWatchMailboxes(account.Boxes, events).
 				WithStartupSync(topConfig.StartupSync)
 
+			l := logging.FromContext(ctx).With(slog.String("account", account.Alias))
+			ctx = logging.WithLogger(ctx, l)
+
 			if err := wb.Connect(ctx, flagRetries); err != nil {
-				slog.Error("Initial connection failed, skip all account mailboxes",
-					slog.String("account", account.Alias), slog.Any("error", err))
+				l.Error("Initial connection failed, skip all account mailboxes",
+					slog.Any("error", err))
 				continue
 			}
 

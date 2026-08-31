@@ -5,12 +5,14 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/dsh2dsh/goimapnotify/internal/logging"
 )
 
 func (self *WatchMailboxes) startWatchdog(ctx context.Context,
 ) (deferFunc func()) {
 	d := self.watchdogInterval()
-	l := self.logger()
+	l := logging.FromContext(ctx)
 	l.Info("start ping watchdog", slog.Duration("timeout", d))
 
 	self.watchdogTicker = time.NewTicker(d)
@@ -32,9 +34,9 @@ func (self *WatchMailboxes) watchdog(ctx context.Context) {
 	select {
 	case <-ctx.Done():
 		self.watchdogTicker.Stop()
-		self.logger().Info("ping watchdog stopped", slog.Any("reason", ctx.Err()))
+		logging.FromContext(ctx).Info("ping watchdog stopped", slog.Any("reason", ctx.Err()))
 	case <-self.watchdogTicker.C:
 		self.stopWatchdog()
-		self.logger().Info("ping watchdog timed out, reconnect to event source")
+		logging.FromContext(ctx).Info("ping watchdog timed out, reconnect to event source")
 	}
 }
