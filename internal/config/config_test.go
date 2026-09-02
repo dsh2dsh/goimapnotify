@@ -46,6 +46,7 @@ configurations:
     onNewMail: [ "imapnotify.sh", "{{ .Mailbox }}" ]
     boxes:
       - mailbox: "INBOX"
+        notifyNewMail: true
         notificationActions:
           - key: "default"
             label: "View"
@@ -65,6 +66,10 @@ configurations:
 			Category:      "email.arrived",
 			DesktopEntry:  "goimapnotify",
 			ActionTimeout: 10 * time.Second,
+			NewMail: NotificationTemplate{
+				Summary: "{{ .Mailbox }} ({{ .Count }})",
+				Body:    "<i>{{ .Authors }}</i>\n{{ .Subject }}",
+			},
 		},
 		Configurations: []*NotifyConfig{
 			{
@@ -76,7 +81,8 @@ configurations:
 				OnNewMail: &command.Templated{},
 				Boxes: []*Box{
 					{
-						Mailbox: "INBOX",
+						Mailbox:       "INBOX",
+						NotifyNewMail: true,
 						NotificationActions: []*NotificationAction{
 							{
 								Key:      "default",
@@ -112,6 +118,10 @@ boxes: [ "INBOX" ]`
 		DesktopNotify: DesktopNotification{
 			AppName:       "goimapnotify",
 			ActionTimeout: 10 * time.Second,
+			NewMail: NotificationTemplate{
+				Summary: "{{ .Mailbox }} ({{ .Count }})",
+				Body:    "<i>{{ .Authors }}</i>\n{{ .Subject }}",
+			},
 		},
 		Configurations: []*NotifyConfig{
 			{
