@@ -142,6 +142,31 @@ testing.
   `ping` defines keep-alive interval in seconds. How often server will send ping
   events. Default value is 5 minutes and usually you don't need this option.
 
+  If configured, it can notify about new mails without running any commands. See
+  above how to enable and configure desktop notifications. After that this
+  configuration enables desktop notifications for new mails:
+
+  ```yaml
+  configurations:
+    - username: "username@fastmail.com"
+      password: "long-and-secret-api-token"
+      jmap: true
+      boxes:
+        - mailbox: "Inbox"
+          notifyNewMail: true
+  ```
+
+  Notification template can be changed. Here is its default value:
+
+  ```yaml
+  desktopNotify:
+    newMail:
+      summary: "{{ .Mailbox }} ({{ .Count }})"
+      body: |
+        <i>{{ .Authors }}</i>
+        {{ .Subject }}
+  ```
+
 ## Configuration
 
 This application is mostly compatible with the configuration of

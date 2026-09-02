@@ -208,7 +208,7 @@ accountLoop:
 		}
 
 		if account.JMAP {
-			wb := jmap.NewWatchMailboxes(account.Boxes, events).
+			wb := jmap.NewWatchMailboxes(account.Boxes, events, running).
 				WithStartupSync(topConfig.StartupSync)
 
 			l := logging.FromContext(ctx).With(slog.String("account", account.Alias))

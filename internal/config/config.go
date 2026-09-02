@@ -34,12 +34,18 @@ type Configuration struct {
 }
 
 type DesktopNotification struct {
-	Enable        bool          `yaml:"enable"`
-	AppName       string        `yaml:"appName" validate:"required_with=Enable"`
-	AppIcon       string        `yaml:"appIcon"`
-	Category      string        `yaml:"category"`
-	DesktopEntry  string        `yaml:"desktopEntry"`
-	ActionTimeout time.Duration `yaml:"actionTimeout" validate:"min=0"`
+	Enable        bool                 `yaml:"enable"`
+	AppName       string               `yaml:"appName" validate:"required_with=Enable"`
+	AppIcon       string               `yaml:"appIcon"`
+	Category      string               `yaml:"category"`
+	DesktopEntry  string               `yaml:"desktopEntry"`
+	ActionTimeout time.Duration        `yaml:"actionTimeout" validate:"min=0"`
+	NewMail       NotificationTemplate `yaml:"newMail"`
+}
+
+type NotificationTemplate struct {
+	Summary string `yaml:"summary"`
+	Body    string `yaml:"body"`
 }
 
 // ConfigurationLegacy holds the old configuration format
@@ -160,6 +166,7 @@ type Box struct {
 	OnDeletedMail     *command.Templated `yaml:"onDeletedMail" validate:"omitnil,validateFn"`
 	OnDeletedMailPost *command.Templated `yaml:"onDeletedMailPost" validate:"omitnil,validateFn"`
 
+	NotifyNewMail       bool                  `yaml:"notifyNewMail"`
 	NotificationActions []*NotificationAction `yaml:"notificationActions" validate:"dive"`
 }
 

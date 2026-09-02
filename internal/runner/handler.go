@@ -57,7 +57,7 @@ func (self *handler) WithNotifier(n *notifier) *handler {
 	return self
 }
 
-func (self *handler) Schedule(e *box.IDLE) {
+func (self *handler) Schedule(e *box.IDLE) bool {
 	self.events.Add(e)
 	d, ok := self.reschedule()
 
@@ -70,19 +70,24 @@ func (self *handler) Schedule(e *box.IDLE) {
 
 	if !ok {
 		l.Info("keep scheduled syncing", slog.Duration("maxWait", self.maxWait))
-		return
+		return false
 	}
 
+	var started bool
 	l = l.With(slog.Time("when", time.Now().Add(self.wait)))
+
 	switch {
 	case self.t == nil:
 		self.t = time.NewTimer(self.wait)
+		started = true
+		l = l.With(slog.Bool("started", started))
 		fallthrough
 	case !self.t.Reset(self.wait):
 		l.Info("scheduled syncing")
 	default:
 		l.Info("rescheduled syncing")
 	}
+	return started
 }
 
 func (self *handler) reschedule() (time.Duration, bool) {
@@ -246,3 +251,5 @@ func (self *handler) ActionConfig(key string) *config.NotificationAction {
 func (self *handler) Alias() string { return self.box.Alias() }
 
 func (self *handler) Mailbox() string { return self.box.Mailbox }
+
+func (self *handler) Actions() []notify.Action { return self.notifyActions }

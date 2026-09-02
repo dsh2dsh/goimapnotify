@@ -29,6 +29,10 @@ func LoadBytes(b []byte) (*Configuration, error) {
 		DesktopNotify: DesktopNotification{
 			AppName:       "goimapnotify",
 			ActionTimeout: 10 * time.Second,
+			NewMail: NotificationTemplate{
+				Summary: "{{ .Mailbox }} ({{ .Count }})",
+				Body:    "<i>{{ .Authors }}</i>\n{{ .Subject }}",
+			},
 		},
 	}
 	if err := yaml.Unmarshal(b, cfg); err != nil {

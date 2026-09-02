@@ -31,6 +31,8 @@ func (self EventType) String() string {
 		return "Changed Flag on Email"
 	case EventNewMail:
 		return "New Email"
+	case StopWatching:
+		return "Stop Wathing Mailbox"
 	default:
 		return "Unknown Event"
 	}

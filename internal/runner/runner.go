@@ -19,18 +19,22 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/logging"
 )
 
 type Runner struct {
 	wait     time.Duration
 	maxWait  time.Duration
-	handlers map[*box.Box]*handler
 	notifier *notifier
+
+	mu       sync.Mutex
+	handlers map[*box.Box]*handler
 	wg       sync.WaitGroup
 }
 
@@ -57,19 +61,26 @@ func (self *Runner) EnableDesktopNotifications(ctx context.Context,
 }
 
 func (self *Runner) Schedule(ctx context.Context, e *box.IDLE) {
-	if h, ok := self.handlers[e.Box()]; ok {
-		h.Schedule(e)
-		return
+	h := self.handler(e.Box())
+	if h.Schedule(e) {
+		self.wg.Go(func() { h.Run(ctx) })
+	}
+}
+
+func (self *Runner) handler(b *box.Box) *handler {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
+	if h, ok := self.handlers[b]; ok {
+		return h
 	}
 
-	h := NewHandler(e.Box(), self.wait).WithMaxDelay(self.maxWait)
+	h := NewHandler(b, self.wait).WithMaxDelay(self.maxWait)
 	if self.notifier != nil {
 		h.WithNotifier(self.notifier)
 	}
-	self.handlers[e.Box()] = h
-
-	h.Schedule(e)
-	self.wg.Go(func() { h.Run(ctx) })
+	self.handlers[b] = h
+	return h
 }
 
 func (self *Runner) Wait() { self.wg.Wait() }
@@ -78,4 +89,23 @@ func (self *Runner) Close() {
 	if self.notifier != nil {
 		self.notifier.Close()
 	}
+}
+
+func (self *Runner) NotifyNewMails(ctx context.Context, b *box.Box,
+	threads []box.Thread,
+) error {
+	if self.notifier == nil {
+		return nil
+	}
+
+	logging.FromContext(ctx).Debug("notify new mails",
+		slog.Int("threads", len(threads)))
+
+	h := self.handler(b)
+	for _, thread := range threads {
+		if err := self.notifier.NotifyNewMail(ctx, b, h, thread); err != nil {
+			return err
+		}
+	}
+	return nil
 }

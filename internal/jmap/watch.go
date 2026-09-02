@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"iter"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +21,7 @@ import (
 	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/logging"
+	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
 const (
@@ -31,6 +34,7 @@ type WatchMailboxes struct {
 	retries     int
 	startupSync bool
 	events      chan<- *box.IDLE
+	runner      *runner.Runner
 
 	client      *client
 	jmapBoxes   *mailboxes
@@ -49,10 +53,12 @@ type WatchMailboxes struct {
 }
 
 func NewWatchMailboxes(boxes []*box.Box, events chan<- *box.IDLE,
+	runner *runner.Runner,
 ) *WatchMailboxes {
 	return (&WatchMailboxes{
 		boxes:        boxes,
 		events:       events,
+		runner:       runner,
 		pingInterval: pingInterval,
 	}).init()
 }
@@ -486,7 +492,7 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 	for _, p := range [...]string{"/created", "/updated"} {
 		req.Invoke(&email.Get{
 			Account:    self.client.AccountId(),
-			Properties: []string{"mailboxIds", "threadId"},
+			Properties: []string{"mailboxIds", "threadId", "from", "subject"},
 			ReferenceIDs: &jmap.ResultReference{
 				ResultOf: callId,
 				Name:     emailChanges.Name(),
@@ -514,7 +520,7 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 		slog.Any("destroyed", r.Destroyed),
 		slog.Bool("hasMoreChanges", r.HasMoreChanges))
 
-	notifiers := [...]func(context.Context, []*email.Email) error{
+	notifiers := [...]func(context.Context, []*email.Email){
 		self.notifyCreated,
 		self.notifyUpdated,
 	}
@@ -524,20 +530,10 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 		if !ok {
 			return false, fmt.Errorf("unexpected jmap response[%d]: %T", i+1,
 				resp.Responses[i+1].Args)
-		} else if len(r.List) == 0 {
-			continue
 		}
-
-		if err := fn(ctx, r.List); err != nil {
-			return false, fmt.Errorf("process fetched Emails: %w", err)
-		}
+		fn(ctx, r.List)
 	}
-
-	if len(r.Destroyed) != 0 {
-		if err := self.notifyDeleted(ctx, r.Destroyed); err != nil {
-			return false, fmt.Errorf("process destroyed Emails: %w", err)
-		}
-	}
+	self.notifyDeleted(ctx, r.Destroyed)
 
 	self.emailState = r.NewState
 	return r.HasMoreChanges, nil
@@ -545,20 +541,45 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 
 func (self *WatchMailboxes) notifyCreated(ctx context.Context,
 	emails []*email.Email,
-) error {
+) {
+	if len(emails) == 0 {
+		return
+	}
+
 	mailboxes := make(map[jmap.ID]int)
+	threads := make(map[jmap.ID]map[jmap.ID]box.Thread)
 	for _, m := range emails {
 		self.jmapBoxes.AddEmail(m)
 		for id := range m.MailboxIDs {
 			mailboxes[id]++
+
+			mailboxThreads, ok := threads[id]
+			if !ok {
+				mailboxThreads = make(map[jmap.ID]box.Thread)
+				threads[id] = mailboxThreads
+			}
+
+			t, ok := mailboxThreads[m.ThreadID]
+			if !ok {
+				t.From = make(map[string]string)
+			}
+
+			for _, f := range m.From {
+				address := strings.TrimSpace(f.Email)
+				t.From[address] = strings.TrimSpace(f.Name)
+			}
+			t.Subject = m.Subject
+			t.Count++
+			mailboxThreads[m.ThreadID] = t
 		}
 	}
-	return self.syncMailboxes(ctx, mailboxes, box.EventNewMail)
+	self.syncMailboxes(ctx, mailboxes, box.EventNewMail)
+	self.notifyNewMails(ctx, threads)
 }
 
 func (self *WatchMailboxes) notifyUpdated(ctx context.Context,
 	emails []*email.Email,
-) error {
+) {
 	deleted, updated := self.updatedMailboxes(emails)
 
 	events := []struct {
@@ -570,11 +591,8 @@ func (self *WatchMailboxes) notifyUpdated(ctx context.Context,
 	}
 
 	for _, e := range events {
-		if err := self.syncMailboxes(ctx, e.mailboxes, e.event); err != nil {
-			return err
-		}
+		self.syncMailboxes(ctx, e.mailboxes, e.event)
 	}
-	return nil
 }
 
 func (self *WatchMailboxes) updatedMailboxes(emails []*email.Email) (deleted,
@@ -607,8 +625,11 @@ func (self *WatchMailboxes) updatedMailboxes(emails []*email.Email) (deleted,
 	return deleted, updated
 }
 
-func (self *WatchMailboxes) notifyDeleted(ctx context.Context, ids []jmap.ID,
-) error {
+func (self *WatchMailboxes) notifyDeleted(ctx context.Context, ids []jmap.ID) {
+	if len(ids) == 0 {
+		return
+	}
+
 	mailboxes := make(map[jmap.ID]int)
 	for _, id := range ids {
 		m := self.jmapBoxes.Email(id)
@@ -620,12 +641,12 @@ func (self *WatchMailboxes) notifyDeleted(ctx context.Context, ids []jmap.ID,
 		}
 		self.jmapBoxes.DeleteEmail(m.ID)
 	}
-	return self.syncMailboxes(ctx, mailboxes, box.EventDeletedMail)
+	self.syncMailboxes(ctx, mailboxes, box.EventDeletedMail)
 }
 
 func (self *WatchMailboxes) syncMailboxes(ctx context.Context,
 	mailboxes map[jmap.ID]int, event box.EventType,
-) error {
+) {
 	l := logging.FromContext(ctx)
 	for id, count := range mailboxes {
 		mb := self.jmapBoxes.Mailbox(id)
@@ -644,5 +665,31 @@ func (self *WatchMailboxes) syncMailboxes(ctx context.Context,
 			slog.Int("count", count))
 		self.sendEvent(ctx, b, event)
 	}
-	return nil
+}
+
+func (self *WatchMailboxes) notifyNewMails(ctx context.Context,
+	threads map[jmap.ID]map[jmap.ID]box.Thread,
+) {
+	for id, t := range threads {
+		mb := self.jmapBoxes.Mailbox(id)
+		if mb == nil {
+			continue
+		}
+
+		b := mb.Watching()
+		if b == nil || !b.NotifyNewMail {
+			continue
+		}
+
+		l := logging.FromContext(ctx).With(slog.String("mailbox", mb.Path()))
+		ctx := logging.WithLogger(ctx, l)
+		mailboxThreads := slices.AppendSeq(make([]box.Thread, 0, len(t)),
+			maps.Values(t))
+
+		err := self.runner.NotifyNewMails(ctx, b, mailboxThreads)
+		if err != nil {
+			l.Error("unable notify new mail", slog.Any("error", err))
+			return
+		}
+	}
 }

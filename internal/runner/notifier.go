@@ -1,12 +1,15 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,11 +17,16 @@ import (
 	"github.com/esiqveland/notify"
 	"github.com/godbus/dbus/v5"
 
+	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/logging"
 )
 
 type notifier struct {
 	ctx context.Context
+
+	summaryTemplate *template.Template
+	bodyTemplate    *template.Template
 
 	dbus          *dbus.Conn
 	notifier      notify.Notifier
@@ -41,6 +49,10 @@ func (self *notifier) Connect(ctx context.Context,
 ) error {
 	self.ctx = ctx
 
+	if err := self.compileTemplates(cfg); err != nil {
+		return fmt.Errorf("compile new mail notification: %w", err)
+	}
+
 	conn, err := DBusConnect(ctx)
 	if err != nil {
 		return err
@@ -58,6 +70,28 @@ func (self *notifier) Connect(ctx context.Context,
 	self.notification = DesktopNotificationFrom(cfg)
 	self.actionTimeout = cfg.ActionTimeout
 	return nil
+}
+
+func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
+	if s := strings.TrimSpace(cfg.NewMail.Summary); s != "" {
+		t, err := template.New("").Parse(s)
+		if err != nil {
+			return fmt.Errorf("parse summary template: %w", err)
+		}
+		self.summaryTemplate = t
+	}
+
+	if s := strings.TrimSpace(cfg.NewMail.Body); s != "" {
+		t, err := template.New("").Parse(s)
+		if err != nil {
+			return fmt.Errorf("parse body template: %w", err)
+		}
+		self.bodyTemplate = t
+	}
+
+	b := box.Box{Box: &config.Box{}}
+	_, _, err := self.renderNewMail(&b, box.Thread{})
+	return err
 }
 
 func DBusConnect(ctx context.Context) (conn *dbus.Conn,
@@ -252,4 +286,66 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 		slog.Int("watching", watching),
 		slog.Int64("running", self.running.Load()))
 	return nil
+}
+
+func (self *notifier) NotifyNewMail(ctx context.Context, b *box.Box, h *handler,
+	thread box.Thread,
+) error {
+	summary, body, err := self.renderNewMail(b, thread)
+	if err != nil {
+		return fmt.Errorf("execute new mail template: %w", err)
+	}
+
+	n := notify.Notification{
+		Summary: summary,
+		Body:    body,
+		Actions: h.Actions(),
+	}
+
+	l := logging.FromContext(ctx)
+	l.Debug("send desktop notification")
+
+	if err := self.Send(n, h, l); err != nil {
+		return fmt.Errorf("send desktop notification: %w", err)
+	}
+	return nil
+}
+
+func (self *notifier) renderNewMail(b *box.Box, thread box.Thread) (summary,
+	body string, _ error,
+) {
+	data := struct {
+		Mailbox string
+		Count   int
+		Authors string
+		Subject string
+	}{
+		Mailbox: b.Mailbox,
+		Count:   thread.Count,
+		Subject: thread.Subject,
+	}
+
+	authors := make([]string, 0, len(thread.From))
+	for address, name := range thread.From {
+		switch {
+		case name != "":
+			authors = append(authors, name)
+		case address != "":
+			authors = append(authors, address)
+		}
+	}
+	data.Authors = strings.Join(authors, ", ")
+
+	var buf bytes.Buffer
+	if err := self.summaryTemplate.Execute(&buf, &data); err != nil {
+		return "", "", fmt.Errorf("execute summary template: %w", err)
+	}
+	summary = buf.String()
+
+	buf.Reset()
+	if err := self.bodyTemplate.Execute(&buf, &data); err != nil {
+		return "", "", fmt.Errorf("execute body template: %w", err)
+	}
+	body = buf.String()
+	return summary, body, nil
 }
