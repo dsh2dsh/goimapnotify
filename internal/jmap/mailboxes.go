@@ -10,7 +10,7 @@ import (
 	"git.sr.ht/~rockorager/go-jmap/mail/email"
 	"git.sr.ht/~rockorager/go-jmap/mail/mailbox"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 type Mailbox struct {
@@ -18,12 +18,12 @@ type Mailbox struct {
 
 	path     string
 	children []*Mailbox
-	watching *box.Box
+	watching *model.Box
 }
 
 func (self *Mailbox) Path() string { return self.path }
 
-func (self *Mailbox) Watching() *box.Box { return self.watching }
+func (self *Mailbox) Watching() *model.Box { return self.watching }
 
 type mailboxes struct {
 	mailboxes map[jmap.ID]*Mailbox
@@ -111,7 +111,7 @@ func (self *mailboxes) every(m *Mailbox, yield func(*Mailbox) bool) bool {
 
 func (self *mailboxes) Len() int { return len(self.mailboxes) }
 
-func (self *mailboxes) Watch(b *box.Box) *Mailbox {
+func (self *mailboxes) Watch(b *model.Box) *Mailbox {
 	m := self.paths[b.Mailbox]
 	if m == nil {
 		return nil

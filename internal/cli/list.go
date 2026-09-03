@@ -8,10 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/jmap"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 var listCmd = cobra.Command{
@@ -26,7 +26,7 @@ var listCmd = cobra.Command{
 
 func listMailboxes(topConfig *config.Configuration) error {
 	for _, account := range topConfig.Configurations {
-		var boxes *box.List
+		var boxes *model.List
 
 		if account.JMAP {
 			l, err := jmap.List(context.Background(), account, flagRetries)

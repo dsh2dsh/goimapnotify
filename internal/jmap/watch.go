@@ -18,9 +18,9 @@ import (
 	"git.sr.ht/~rockorager/go-jmap/mail"
 	"git.sr.ht/~rockorager/go-jmap/mail/email"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/logging"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
@@ -30,10 +30,10 @@ const (
 )
 
 type WatchMailboxes struct {
-	boxes       []*box.Box
+	boxes       []*model.Box
 	retries     int
 	startupSync bool
-	events      chan<- *box.IDLE
+	events      chan<- *model.IDLE
 	runner      *runner.Runner
 
 	client      *client
@@ -52,7 +52,7 @@ type WatchMailboxes struct {
 	wakeupFetcher chan struct{}
 }
 
-func NewWatchMailboxes(boxes []*box.Box, events chan<- *box.IDLE,
+func NewWatchMailboxes(boxes []*model.Box, events chan<- *model.IDLE,
 	runner *runner.Runner,
 ) *WatchMailboxes {
 	return (&WatchMailboxes{
@@ -275,7 +275,7 @@ func (self *WatchMailboxes) Watch(ctx context.Context) {
 	}
 
 	if ctx.Err() == nil {
-		self.sendEvent(ctx, self.boxes[0], box.StopWatching)
+		self.sendEvent(ctx, self.boxes[0], model.StopWatching)
 	}
 	self.close(ctx)
 }
@@ -287,12 +287,12 @@ func (self *WatchMailboxes) close(ctx context.Context) {
 	self.wg.Wait()
 }
 
-func (self *WatchMailboxes) sendEvent(ctx context.Context, b *box.Box,
-	reason box.EventType,
+func (self *WatchMailboxes) sendEvent(ctx context.Context, b *model.Box,
+	reason model.EventType,
 ) {
 	select {
 	case <-ctx.Done():
-	case self.events <- box.NewEvent(b, reason):
+	case self.events <- model.NewEvent(b, reason):
 	}
 }
 
@@ -341,7 +341,7 @@ func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
 		l.Info(
 			"issuing fake event for first time sync (skipping post-commands)",
 			slog.String("mailbox", b.Mailbox))
-		self.sendEvent(ctx, b, box.EventSync)
+		self.sendEvent(ctx, b, model.EventSync)
 	}
 	self.startupSync = false
 }
@@ -547,7 +547,7 @@ func (self *WatchMailboxes) notifyCreated(ctx context.Context,
 	}
 
 	mailboxes := make(map[jmap.ID]int)
-	threads := make(map[jmap.ID]map[jmap.ID]box.Thread)
+	threads := make(map[jmap.ID]map[jmap.ID]model.Thread)
 	for _, m := range emails {
 		self.jmapBoxes.AddEmail(m)
 		for id := range m.MailboxIDs {
@@ -555,7 +555,7 @@ func (self *WatchMailboxes) notifyCreated(ctx context.Context,
 
 			mailboxThreads, ok := threads[id]
 			if !ok {
-				mailboxThreads = make(map[jmap.ID]box.Thread)
+				mailboxThreads = make(map[jmap.ID]model.Thread)
 				threads[id] = mailboxThreads
 			}
 
@@ -573,7 +573,7 @@ func (self *WatchMailboxes) notifyCreated(ctx context.Context,
 			mailboxThreads[m.ThreadID] = t
 		}
 	}
-	self.syncMailboxes(ctx, mailboxes, box.EventNewMail)
+	self.syncMailboxes(ctx, mailboxes, model.EventNewMail)
 	self.notifyNewMails(ctx, threads)
 }
 
@@ -584,10 +584,10 @@ func (self *WatchMailboxes) notifyUpdated(ctx context.Context,
 
 	events := []struct {
 		mailboxes map[jmap.ID]int
-		event     box.EventType
+		event     model.EventType
 	}{
-		{deleted, box.EventDeletedMail},
-		{updated, box.EventFlagChanged},
+		{deleted, model.EventDeletedMail},
+		{updated, model.EventFlagChanged},
 	}
 
 	for _, e := range events {
@@ -641,11 +641,11 @@ func (self *WatchMailboxes) notifyDeleted(ctx context.Context, ids []jmap.ID) {
 		}
 		self.jmapBoxes.DeleteEmail(m.ID)
 	}
-	self.syncMailboxes(ctx, mailboxes, box.EventDeletedMail)
+	self.syncMailboxes(ctx, mailboxes, model.EventDeletedMail)
 }
 
 func (self *WatchMailboxes) syncMailboxes(ctx context.Context,
-	mailboxes map[jmap.ID]int, event box.EventType,
+	mailboxes map[jmap.ID]int, event model.EventType,
 ) {
 	l := logging.FromContext(ctx)
 	for id, count := range mailboxes {
@@ -668,7 +668,7 @@ func (self *WatchMailboxes) syncMailboxes(ctx context.Context,
 }
 
 func (self *WatchMailboxes) notifyNewMails(ctx context.Context,
-	threads map[jmap.ID]map[jmap.ID]box.Thread,
+	threads map[jmap.ID]map[jmap.ID]model.Thread,
 ) {
 	for id, t := range threads {
 		mb := self.jmapBoxes.Mailbox(id)
@@ -683,7 +683,7 @@ func (self *WatchMailboxes) notifyNewMails(ctx context.Context,
 
 		l := logging.FromContext(ctx).With(slog.String("mailbox", mb.Path()))
 		ctx := logging.WithLogger(ctx, l)
-		mailboxThreads := slices.AppendSeq(make([]box.Thread, 0, len(t)),
+		mailboxThreads := slices.AppendSeq(make([]model.Thread, 0, len(t)),
 			maps.Values(t))
 
 		err := self.runner.NotifyNewMails(ctx, b, mailboxThreads)

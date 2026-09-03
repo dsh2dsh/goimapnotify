@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
@@ -36,11 +36,11 @@ func showTestNotification() error {
 		return fmt.Errorf("trying to enable desktop notifications: %w", err)
 	}
 
-	b := box.Box{
+	b := model.Box{
 		Box: &config.Box{Mailbox: "Inbox"},
 	}
 
-	threads := []box.Thread{
+	threads := []model.Thread{
 		{
 			From: map[string]string{
 				"john@localhost": "John Doe",

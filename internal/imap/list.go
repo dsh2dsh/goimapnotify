@@ -6,8 +6,8 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 func Mailboxes(account *config.NotifyConfig, retries int,
@@ -42,7 +42,7 @@ func Mailboxes(account *config.NotifyConfig, retries int,
 	}
 }
 
-func List(account *config.NotifyConfig, retries int) (*box.List, error) {
+func List(account *config.NotifyConfig, retries int) (*model.List, error) {
 	c, err := New(account, retries)
 	if err != nil {
 		return nil, fmt.Errorf("something went wrong creating IMAP client: %w", err)
@@ -50,7 +50,7 @@ func List(account *config.NotifyConfig, retries int) (*box.List, error) {
 	defer c.Close()
 
 	listCmd := c.List("", "*", nil)
-	listBoxes := new(box.List)
+	listBoxes := new(model.List)
 
 	for {
 		m := listCmd.Next()

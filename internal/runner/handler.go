@@ -10,16 +10,16 @@ import (
 
 	"github.com/esiqveland/notify"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 type handler struct {
-	box     *box.Box
+	box     *model.Box
 	wait    time.Duration
 	maxWait time.Duration
 
-	events box.EventSet
+	events model.EventSet
 	t      *time.Timer
 
 	mu      sync.Mutex
@@ -31,7 +31,7 @@ type handler struct {
 	boxActions    map[string]*config.NotificationAction
 }
 
-func NewHandler(b *box.Box, wait time.Duration) *handler {
+func NewHandler(b *model.Box, wait time.Duration) *handler {
 	return &handler{box: b, wait: wait}
 }
 
@@ -57,7 +57,7 @@ func (self *handler) WithNotifier(n *notifier) *handler {
 	return self
 }
 
-func (self *handler) Schedule(e *box.IDLE) bool {
+func (self *handler) Schedule(e *model.IDLE) bool {
 	self.events.Add(e)
 	d, ok := self.reschedule()
 

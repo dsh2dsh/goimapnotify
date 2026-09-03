@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"iter"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 func List(ctx context.Context, account *config.NotifyConfig, retries int,
-) (*box.List, error) {
+) (*model.List, error) {
 	c, err := New(ctx, account, retries)
 	if err != nil {
 		return nil, fmt.Errorf("something went wrong creating JMAP client: %w", err)
@@ -21,7 +21,7 @@ func List(ctx context.Context, account *config.NotifyConfig, retries int,
 		return nil, err
 	}
 
-	listBoxes := &box.List{
+	listBoxes := &model.List{
 		Delim: '/',
 		Boxes: make([]string, 0, mailboxes.Len()),
 	}

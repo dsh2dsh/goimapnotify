@@ -26,15 +26,15 @@ import (
 	goimap "github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 const maxBackoff = 5 * time.Minute
 
 // WatchMailBox keeps track of the IDLE state of one Mailbox
 type WatchMailBox struct {
-	box         *box.Box
-	events      chan<- *box.IDLE
+	box         *model.Box
+	events      chan<- *model.IDLE
 	startupSync bool
 
 	ctx     context.Context
@@ -45,7 +45,7 @@ type WatchMailBox struct {
 }
 
 // NewWatchBox creates a new instance of WatchMailBox and launches it
-func NewWatchBox(m *box.Box, events chan<- *box.IDLE) *WatchMailBox {
+func NewWatchBox(m *model.Box, events chan<- *model.IDLE) *WatchMailBox {
 	return &WatchMailBox{
 		box:    m,
 		events: events,
@@ -97,13 +97,13 @@ func (self *WatchMailBox) expunge(seqNum uint32) {
 		slog.Uint64("messages", uint64(self.box.ExistingEmail)))
 
 	// messages deleted
-	self.sendEvent(box.EventDeletedMail)
+	self.sendEvent(model.EventDeletedMail)
 }
 
-func (self *WatchMailBox) sendEvent(reason box.EventType) {
+func (self *WatchMailBox) sendEvent(reason model.EventType) {
 	select {
 	case <-self.ctx.Done():
-	case self.events <- box.NewEvent(self.box, reason):
+	case self.events <- model.NewEvent(self.box, reason):
 	}
 }
 
@@ -123,7 +123,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		if numMessages > self.box.ExistingEmail {
 			// messages arrived
 			self.box.ExistingEmail = numMessages
-			self.sendEvent(box.EventNewMail)
+			self.sendEvent(model.EventNewMail)
 		}
 
 	case data.Flags != nil || data.PermanentFlags != nil:
@@ -135,7 +135,7 @@ func (self *WatchMailBox) mailbox(data *imapclient.UnilateralDataMailbox) {
 		}
 
 		// messages flags updated
-		self.sendEvent(box.EventFlagChanged)
+		self.sendEvent(model.EventFlagChanged)
 	}
 	l.Info("IDLE mailbox")
 }
@@ -160,7 +160,7 @@ func (self *WatchMailBox) Watch() {
 	}
 
 	if self.ctx.Err() == nil {
-		self.sendEvent(box.StopWatching)
+		self.sendEvent(model.StopWatching)
 	}
 }
 
@@ -231,7 +231,7 @@ func (self *WatchMailBox) watch() bool {
 	if self.startupSync {
 		l.Info(
 			"issuing fake IMAP Event for first time sync (skipping post-commands)")
-		self.sendEvent(box.EventSync)
+		self.sendEvent(model.EventSync)
 	}
 
 	done := make(chan error, 1)

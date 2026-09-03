@@ -17,9 +17,9 @@ import (
 	"github.com/esiqveland/notify"
 	"github.com/godbus/dbus/v5"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/logging"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 type notifier struct {
@@ -89,8 +89,8 @@ func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
 		self.bodyTemplate = t
 	}
 
-	b := box.Box{Box: &config.Box{}}
-	_, _, err := self.renderNewMail(&b, box.Thread{})
+	b := model.Box{Box: &config.Box{}}
+	_, _, err := self.renderNewMail(&b, model.Thread{})
 	return err
 }
 
@@ -288,8 +288,8 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 	return nil
 }
 
-func (self *notifier) NotifyNewMail(ctx context.Context, b *box.Box, h *handler,
-	thread box.Thread,
+func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box, h *handler,
+	thread model.Thread,
 ) error {
 	summary, body, err := self.renderNewMail(b, thread)
 	if err != nil {
@@ -311,7 +311,7 @@ func (self *notifier) NotifyNewMail(ctx context.Context, b *box.Box, h *handler,
 	return nil
 }
 
-func (self *notifier) renderNewMail(b *box.Box, thread box.Thread) (summary,
+func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 	body string, _ error,
 ) {
 	data := struct {

@@ -32,12 +32,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/cli/logger"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/imap"
 	"github.com/dsh2dsh/goimapnotify/internal/jmap"
 	"github.com/dsh2dsh/goimapnotify/internal/logging"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
@@ -197,7 +197,7 @@ func Run() error {
 		}
 	}
 
-	events := make(chan *box.IDLE)
+	events := make(chan *model.IDLE)
 	var wg sync.WaitGroup
 	var watching int
 
@@ -261,7 +261,7 @@ idleLoop:
 
 		case e := <-events:
 			switch e.Reason() {
-			case box.StopWatching:
+			case model.StopWatching:
 				watching--
 				if watching == 0 {
 					slog.Error("nothing left to watch, exiting")
@@ -289,7 +289,7 @@ idleLoop:
 type accountBoxes struct {
 	*config.NotifyConfig
 
-	Boxes []*box.Box
+	Boxes []*model.Box
 }
 
 func boxesFromConfig(ctx context.Context, c []*config.NotifyConfig, retries int,
@@ -310,7 +310,7 @@ func boxesFromConfig(ctx context.Context, c []*config.NotifyConfig, retries int,
 			}
 		}
 
-		boxes, err := box.CompileBoxes(accountConfig, configuredBoxes)
+		boxes, err := model.CompileBoxes(accountConfig, configuredBoxes)
 		if err != nil {
 			return 0, nil, err
 		}

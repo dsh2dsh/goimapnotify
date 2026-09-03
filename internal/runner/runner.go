@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dsh2dsh/goimapnotify/internal/box"
 	"github.com/dsh2dsh/goimapnotify/internal/config"
 	"github.com/dsh2dsh/goimapnotify/internal/logging"
+	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
 type Runner struct {
@@ -34,14 +34,14 @@ type Runner struct {
 	notifier *notifier
 
 	mu       sync.Mutex
-	handlers map[*box.Box]*handler
+	handlers map[*model.Box]*handler
 	wg       sync.WaitGroup
 }
 
 func New(n int, wait time.Duration) *Runner {
 	return &Runner{
 		wait:     wait * time.Second,
-		handlers: make(map[*box.Box]*handler, n),
+		handlers: make(map[*model.Box]*handler, n),
 	}
 }
 
@@ -60,14 +60,14 @@ func (self *Runner) EnableDesktopNotifications(ctx context.Context,
 	return nil
 }
 
-func (self *Runner) Schedule(ctx context.Context, e *box.IDLE) {
+func (self *Runner) Schedule(ctx context.Context, e *model.IDLE) {
 	h := self.handler(e.Box())
 	if h.Schedule(e) {
 		self.wg.Go(func() { h.Run(ctx) })
 	}
 }
 
-func (self *Runner) handler(b *box.Box) *handler {
+func (self *Runner) handler(b *model.Box) *handler {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
@@ -91,8 +91,8 @@ func (self *Runner) Close() {
 	}
 }
 
-func (self *Runner) NotifyNewMails(ctx context.Context, b *box.Box,
-	threads []box.Thread,
+func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
+	threads []model.Thread,
 ) error {
 	if self.notifier == nil {
 		return nil
