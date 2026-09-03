@@ -322,30 +322,24 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 	}{
 		Mailbox: b.Mailbox,
 		Count:   thread.Count,
+		Authors: strings.Join(thread.From, ", "),
 		Subject: thread.Subject,
 	}
 
-	authors := make([]string, 0, len(thread.From))
-	for address, name := range thread.From {
-		switch {
-		case name != "":
-			authors = append(authors, name)
-		case address != "":
-			authors = append(authors, address)
-		}
-	}
-	data.Authors = strings.Join(authors, ", ")
-
 	var buf bytes.Buffer
-	if err := self.summaryTemplate.Execute(&buf, &data); err != nil {
-		return "", "", fmt.Errorf("execute summary template: %w", err)
+	if t := self.summaryTemplate; t != nil {
+		if err := t.Execute(&buf, &data); err != nil {
+			return "", "", fmt.Errorf("execute summary template: %w", err)
+		}
+		summary = buf.String()
 	}
-	summary = buf.String()
 
-	buf.Reset()
-	if err := self.bodyTemplate.Execute(&buf, &data); err != nil {
-		return "", "", fmt.Errorf("execute body template: %w", err)
+	if t := self.bodyTemplate; t != nil {
+		buf.Reset()
+		if err := t.Execute(&buf, &data); err != nil {
+			return "", "", fmt.Errorf("execute body template: %w", err)
+		}
+		body = buf.String()
 	}
-	body = buf.String()
 	return summary, body, nil
 }

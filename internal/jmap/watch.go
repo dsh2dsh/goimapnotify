@@ -559,20 +559,21 @@ func (self *WatchMailboxes) notifyCreated(ctx context.Context,
 				threads[id] = mailboxThreads
 			}
 
-			t, ok := mailboxThreads[m.ThreadID]
-			if !ok {
-				t.From = make(map[string]string)
-			}
-
+			t := mailboxThreads[m.ThreadID]
 			for _, f := range m.From {
-				address := strings.TrimSpace(f.Email)
-				t.From[address] = strings.TrimSpace(f.Name)
+				for _, s := range [...]string{f.Name, f.Email} {
+					if s = strings.TrimSpace(s); s != "" {
+						t.From = append(t.From, s)
+						break
+					}
+				}
 			}
 			t.Subject = m.Subject
 			t.Count++
 			mailboxThreads[m.ThreadID] = t
 		}
 	}
+
 	self.syncMailboxes(ctx, mailboxes, model.EventNewMail)
 	self.notifyNewMails(ctx, threads)
 }

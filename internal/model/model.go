@@ -6,7 +6,7 @@ type List struct {
 }
 
 type Thread struct {
-	From    map[string]string
+	From    []string
 	Subject string
 	Count   int
 }

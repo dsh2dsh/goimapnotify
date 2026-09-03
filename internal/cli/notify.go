@@ -42,10 +42,7 @@ func showTestNotification() error {
 
 	threads := []model.Thread{
 		{
-			From: map[string]string{
-				"john@localhost": "John Doe",
-				"jane@localhost": "Jane Doe",
-			},
+			From:    []string{"John Doe", "Jane Doe"},
 			Subject: "Lorem ipsum dolor sit amet consectetur adipiscing elit.",
 			Count:   2,
 		},
