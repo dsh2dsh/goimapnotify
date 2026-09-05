@@ -40,6 +40,7 @@ archives:
     files:
       - "LICENSE"
       - "README.md"
+      - "goimapnotify.desktop"
 
 release:
   # If set to auto, will mark the release as not ready for production

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Exec=goimapnotify --syslog
+Icon=internet-mail
+Name=goimapnotify
+Categories=Network;Email;
+Path=
+StartupNotify=false
+Terminal=false
+TerminalOptions=
+Type=Application
