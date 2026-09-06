@@ -343,3 +343,15 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 	}
 	return summary, body, nil
 }
+
+func (self *notifier) NotifySimple(ctx context.Context, summary, body string,
+) error {
+	l := logging.FromContext(ctx)
+	l.Debug("send desktop notification")
+
+	n := notify.Notification{Summary: summary, Body: body}
+	if err := self.Send(n, nil, l); err != nil {
+		return fmt.Errorf("send desktop notification: %w", err)
+	}
+	return nil
+}

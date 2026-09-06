@@ -81,12 +81,16 @@ func (self *WatchMailboxes) Connect(ctx context.Context, retries int) error {
 
 	if err := self.connect(ctx); err != nil {
 		if unableWatch(err) {
+			self.runner.NotifyError(ctx,
+				"Initial connection failed, can't retry", err)
 			return err
 		}
 
 		logging.FromContext(ctx).Error(
 			"Initial connection failed, retrying in background",
 			slog.Any("error", err))
+		self.runner.NotifyError(ctx,
+			"Initial connection failed, retrying in background", err)
 		return nil
 	}
 	return nil
@@ -301,7 +305,7 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 		return true
 	}
 
-	l := slog.With(slog.String("alias", self.accountConfig().Alias))
+	l := logging.FromContext(ctx)
 	backoff := time.Second
 
 	for {
@@ -313,6 +317,7 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 		if err := self.connect(ctx); err != nil {
 			if unableWatch(err) {
 				l.Error("Reconnection failed", slog.Any("error", err))
+				self.runner.NotifyError(ctx, "Reconnection failed", err)
 				return false
 			}
 
@@ -325,6 +330,8 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 
 		l.Info("Reconnected successfully",
 			slog.String("eventSource", self.eventSource))
+		self.runner.NotifyOK(ctx, "Reconnected successfully",
+			"Last backoff was "+backoff.String())
 		return true
 	}
 }
@@ -360,12 +367,14 @@ func (self *WatchMailboxes) watch(ctx context.Context) bool {
 			l.Error("unable build event source request",
 				slog.String("url", self.eventSource),
 				slog.Any("error", err))
+			self.runner.NotifyError(ctx, "Unable build event source request", err)
 			return false
 		}
 
 		for stateChange, err := range self.listen(req) {
 			if err != nil {
 				l.Error("unable read even source", slog.Any("error", err))
+				self.runner.NotifyError(ctx, "Unable read even source, reconnect", err)
 				return true
 			} else if stateChange.Type != "StateChange" {
 				continue
