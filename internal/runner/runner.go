@@ -91,6 +91,15 @@ func (self *Runner) Close() {
 	}
 }
 
+func (self *Runner) Notify(ctx context.Context, b *model.Box, summary,
+	body string,
+) error {
+	if self.notifier == nil {
+		return nil
+	}
+	return self.notifier.Notify(ctx, self.handler(b), summary, body)
+}
+
 func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
 	threads []model.Thread,
 ) error {
@@ -120,7 +129,7 @@ func (self *Runner) NotifyError(ctx context.Context, summary string,
 	l := logging.FromContext(ctx)
 	l.Debug("notify error state", slog.Any("error", bodyErr))
 
-	err := self.notifier.NotifySimple(ctx, summary, bodyErr.Error())
+	err := self.notifier.Notify(ctx, nil, summary, bodyErr.Error())
 	if err != nil {
 		l.Error("unable notify error state", slog.Any("error", err))
 	}
@@ -134,7 +143,7 @@ func (self *Runner) NotifyOK(ctx context.Context, summary, body string) {
 	l := logging.FromContext(ctx)
 	l.Debug("notify OK state")
 
-	err := self.notifier.NotifySimple(ctx, summary, body)
+	err := self.notifier.Notify(ctx, nil, summary, body)
 	if err != nil {
 		l.Error("unable notify OK state", slog.Any("error", err))
 	}

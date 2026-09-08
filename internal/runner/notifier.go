@@ -288,27 +288,14 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 	return nil
 }
 
-func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box, h *handler,
-	thread model.Thread,
+func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box,
+	h *handler, thread model.Thread,
 ) error {
 	summary, body, err := self.renderNewMail(b, thread)
 	if err != nil {
 		return fmt.Errorf("execute new mail template: %w", err)
 	}
-
-	n := notify.Notification{
-		Summary: summary,
-		Body:    body,
-		Actions: h.Actions(),
-	}
-
-	l := logging.FromContext(ctx)
-	l.Debug("send desktop notification")
-
-	if err := self.Send(n, h, l); err != nil {
-		return fmt.Errorf("send desktop notification: %w", err)
-	}
-	return nil
+	return self.Notify(ctx, h, summary, body)
 }
 
 func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
@@ -344,13 +331,18 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 	return summary, body, nil
 }
 
-func (self *notifier) NotifySimple(ctx context.Context, summary, body string,
+func (self *notifier) Notify(ctx context.Context, h *handler, summary,
+	body string,
 ) error {
+	n := notify.Notification{Summary: summary, Body: body}
+	if h != nil {
+		n.Actions = h.Actions()
+	}
+
 	l := logging.FromContext(ctx)
 	l.Debug("send desktop notification")
 
-	n := notify.Notification{Summary: summary, Body: body}
-	if err := self.Send(n, nil, l); err != nil {
+	if err := self.Send(n, h, l); err != nil {
 		return fmt.Errorf("send desktop notification: %w", err)
 	}
 	return nil

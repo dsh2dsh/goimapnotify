@@ -166,6 +166,7 @@ type Box struct {
 	OnDeletedMail     *command.Templated `yaml:"onDeletedMail" validate:"omitnil,validateFn"`
 	OnDeletedMailPost *command.Templated `yaml:"onDeletedMailPost" validate:"omitnil,validateFn"`
 
+	StartupNotifyUnread bool                  `yaml:"startupNotifyUnread"`
 	NotifyNewMail       bool                  `yaml:"notifyNewMail"`
 	NotificationActions []*NotificationAction `yaml:"notificationActions" validate:"dive"`
 }

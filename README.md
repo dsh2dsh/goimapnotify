@@ -153,6 +153,7 @@ testing.
       jmap: true
       boxes:
         - mailbox: "Inbox"
+          startupNotifyUnread: false # default
           notifyNewMail: true
   ```
 
@@ -166,6 +167,9 @@ testing.
         <i>{{ .Authors }}</i>
         {{ .Subject }}
   ```
+
+  `startupNotifyUnread: true` shows one time desktop notification on start if
+  this mailbox has unread mails.
 
 ## Configuration
 

@@ -265,17 +265,22 @@ func (self *WatchMailboxes) Watch(ctx context.Context) {
 	self.wakeupFetcher = make(chan struct{}, 1)
 	self.wg.Go(func() { self.fetcher(ctx) })
 
+	var watched bool
 	for self.reconnect(ctx) {
 		if ctx.Err() != nil {
 			break
 		}
 
-		self.syncOnStart(ctx)
+		if !watched {
+			self.syncOnStart(ctx)
+			self.notifyUnread(ctx)
+		}
 
 		if ok := self.watch(ctx); !ok || ctx.Err() != nil {
 			break
 		}
 		self.client = nil
+		watched = true
 	}
 
 	if ctx.Err() == nil {
@@ -353,14 +358,35 @@ func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
 	self.startupSync = false
 }
 
-func (self *WatchMailboxes) watch(ctx context.Context) bool {
-	watchdog, stopWatchdog := context.WithCancel(ctx)
-	self.stopWatchdog = stopWatchdog
-	defer self.stopWatchdog()
+func (self *WatchMailboxes) notifyUnread(ctx context.Context) {
+	l := logging.FromContext(ctx)
+	for _, m := range self.jmapBoxes.Watching() {
+		b := m.Watching()
+		if !b.StartupNotifyUnread || m.UnreadEmails == 0 {
+			continue
+		}
 
+		l.Debug("notify unread emails",
+			slog.String("mailbox", b.Mailbox),
+			slog.Uint64("unread", m.UnreadEmails))
+
+		summary := b.Mailbox + " has " + strconv.FormatUint(m.UnreadEmails, 10) +
+			" unread email(s)"
+		err := self.runner.Notify(ctx, b, summary, "")
+		if err != nil {
+			l.Error("unable notify unread emails", slog.Any("error", err))
+		}
+	}
+}
+
+func (self *WatchMailboxes) watch(ctx context.Context) bool {
+	defer func() { self.stopWatchdog() }()
 	l := logging.FromContext(ctx)
 
 	for {
+		watchdog, stopWatchdog := context.WithCancel(ctx)
+		self.stopWatchdog = stopWatchdog
+
 		req, err := http.NewRequestWithContext(watchdog, http.MethodGet,
 			self.eventSource, nil)
 		if err != nil {
