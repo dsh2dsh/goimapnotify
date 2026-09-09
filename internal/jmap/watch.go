@@ -25,6 +25,7 @@ import (
 )
 
 const (
+	backoff      = time.Second
 	maxBackoff   = 5 * time.Minute
 	pingInterval = 300 // seconds
 )
@@ -32,6 +33,7 @@ const (
 type WatchMailboxes struct {
 	boxes       []*model.Box
 	retries     int
+	backoff     time.Duration
 	startupSync bool
 	events      chan<- *model.IDLE
 	runner      *runner.Runner
@@ -46,7 +48,6 @@ type WatchMailboxes struct {
 	watchdogTicker *time.Ticker
 	stopWatchdog   func()
 
-	wg            sync.WaitGroup
 	emailState    string
 	lastState     atomic.Value
 	wakeupFetcher chan struct{}
@@ -57,6 +58,7 @@ func NewWatchMailboxes(boxes []*model.Box, events chan<- *model.IDLE,
 ) *WatchMailboxes {
 	return (&WatchMailboxes{
 		boxes:        boxes,
+		backoff:      backoff,
 		events:       events,
 		runner:       runner,
 		pingInterval: pingInterval,
@@ -262,38 +264,34 @@ func (self *WatchMailboxes) queryEmails(ctx context.Context) error {
 }
 
 func (self *WatchMailboxes) Watch(ctx context.Context) {
-	self.wakeupFetcher = make(chan struct{}, 1)
-	self.wg.Go(func() { self.fetcher(ctx) })
-
-	var watched bool
-	for self.reconnect(ctx) {
-		if ctx.Err() != nil {
-			break
-		}
-
-		if !watched {
-			self.syncOnStart(ctx)
-			self.notifyUnread(ctx)
-		}
-
-		if ok := self.watch(ctx); !ok || ctx.Err() != nil {
-			break
-		}
-		self.client = nil
-		watched = true
+	defer self.stopWatching(ctx)
+	if self.client == nil && !self.reconnect(ctx) {
+		return
 	}
 
+	self.syncOnStart(ctx)
+	self.notifyUnread(ctx)
+
+	if ctx.Err() != nil {
+		return
+	}
+
+	defer self.goFetcher(ctx)()
+	backoff := self.backoff
+
+	for {
+		d, ok := self.stateChanges(ctx, backoff)
+		if !ok {
+			return
+		}
+		backoff = d
+	}
+}
+
+func (self *WatchMailboxes) stopWatching(ctx context.Context) {
 	if ctx.Err() == nil {
 		self.sendEvent(ctx, self.boxes[0], model.StopWatching)
 	}
-	self.close(ctx)
-}
-
-func (self *WatchMailboxes) close(ctx context.Context) {
-	close(self.wakeupFetcher)
-
-	logging.FromContext(ctx).Info("waiting fetcher goroutine to stop...")
-	self.wg.Wait()
 }
 
 func (self *WatchMailboxes) sendEvent(ctx context.Context, b *model.Box,
@@ -306,22 +304,15 @@ func (self *WatchMailboxes) sendEvent(ctx context.Context, b *model.Box,
 }
 
 func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
-	if self.client != nil {
-		return true
-	}
-
 	l := logging.FromContext(ctx)
-	backoff := time.Second
+	backoff := self.backoff
 
-	for {
-		if !timeAfter(ctx, backoff) {
-			l.Info("Reconnection cancelled, shutting down")
-			return false
-		}
-
+	for timeAfter(ctx, backoff) {
 		if err := self.connect(ctx); err != nil {
 			if unableWatch(err) {
-				l.Error("Reconnection failed", slog.Any("error", err))
+				l.Error("Reconnection failed",
+					slog.Duration("backoff", backoff),
+					slog.Any("error", err))
 				self.runner.NotifyError(ctx, "Reconnection failed", err)
 				return false
 			}
@@ -334,11 +325,16 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 		}
 
 		l.Info("Reconnected successfully",
+			slog.Duration("backoff", backoff),
 			slog.String("eventSource", self.eventSource))
 		self.runner.NotifyOK(ctx, "Reconnected successfully",
-			"Last backoff was "+backoff.String())
+			"Last backoff "+backoff.String())
 		return true
 	}
+
+	l.Info("Reconnection cancelled, shutting down",
+		slog.Duration("backoff", backoff))
+	return false
 }
 
 func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
@@ -347,8 +343,11 @@ func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
 	}
 
 	l := logging.FromContext(ctx)
-
 	for _, m := range self.jmapBoxes.Watching() {
+		if ctx.Err() != nil {
+			return
+		}
+
 		b := m.Watching()
 		l.Info(
 			"issuing fake event for first time sync (skipping post-commands)",
@@ -361,6 +360,10 @@ func (self *WatchMailboxes) syncOnStart(ctx context.Context) {
 func (self *WatchMailboxes) notifyUnread(ctx context.Context) {
 	l := logging.FromContext(ctx)
 	for _, m := range self.jmapBoxes.Watching() {
+		if ctx.Err() != nil {
+			return
+		}
+
 		b := m.Watching()
 		if !b.StartupNotifyUnread || m.UnreadEmails == 0 {
 			continue
@@ -379,50 +382,88 @@ func (self *WatchMailboxes) notifyUnread(ctx context.Context) {
 	}
 }
 
-func (self *WatchMailboxes) watch(ctx context.Context) bool {
-	defer func() { self.stopWatchdog() }()
+func (self *WatchMailboxes) goFetcher(ctx context.Context) func() {
+	self.wakeupFetcher = make(chan struct{}, 1)
+	wg := new(sync.WaitGroup)
+	wg.Go(func() { self.fetcher(ctx) })
+
+	return func() {
+		close(self.wakeupFetcher)
+		logging.FromContext(ctx).Info("waiting fetcher goroutine to stop...")
+		wg.Wait()
+	}
+}
+
+func (self *WatchMailboxes) stateChanges(ctx context.Context,
+	backoff time.Duration,
+) (time.Duration, bool) {
+	watchdog, cancel := context.WithCancel(ctx)
+	self.stopWatchdog = cancel
+	defer cancel()
 	l := logging.FromContext(ctx)
 
-	for {
-		watchdog, stopWatchdog := context.WithCancel(ctx)
-		self.stopWatchdog = stopWatchdog
+	req, err := http.NewRequestWithContext(watchdog, http.MethodGet,
+		self.eventSource, nil)
+	if err != nil {
+		l.Error("unable build event source request",
+			slog.String("url", self.eventSource),
+			slog.Any("error", err))
+		self.runner.NotifyError(ctx, "Unable build event source request", err)
+		return 0, false
+	}
 
-		req, err := http.NewRequestWithContext(watchdog, http.MethodGet,
-			self.eventSource, nil)
+	var connected bool
+	for stateChange, err := range self.listen(req) {
 		if err != nil {
-			l.Error("unable build event source request",
-				slog.String("url", self.eventSource),
+			l.Error("unable read even source, reconnect with delay",
+				slog.Duration("retrying", backoff),
 				slog.Any("error", err))
-			self.runner.NotifyError(ctx, "Unable build event source request", err)
-			return false
+
+			if backoff == self.backoff {
+				self.runner.NotifyError(ctx, "Unable read even source, reconnect", err)
+			}
+
+			if !timeAfter(ctx, backoff) {
+				l.Info("Reconnection cancelled, shutting down",
+					slog.Duration("backoff", backoff))
+				return 0, false
+			}
+			return min(backoff*2, maxBackoff), true
 		}
 
-		for stateChange, err := range self.listen(req) {
-			if err != nil {
-				l.Error("unable read even source", slog.Any("error", err))
-				self.runner.NotifyError(ctx, "Unable read even source, reconnect", err)
-				return true
-			} else if stateChange.Type != "StateChange" {
-				continue
+		if !connected {
+			connected = true
+			if backoff > self.backoff {
+				l.Info("Reconnected successfully", slog.Duration("backoff", backoff))
+				self.runner.NotifyOK(ctx, "Reconnected successfully",
+					"Last backoff "+backoff.String())
 			}
+			backoff = self.backoff
+		}
+
+		if stateChange.Type == "StateChange" {
 			self.stateChanged(ctx, stateChange)
 		}
-
-		if ctx.Err() != nil {
-			return false
-		}
-
-		if self.retryDelay == 0 {
-			l.Info("end of event source, reconnect")
-			continue
-		}
-
-		l.Info("end of event source, reconnect after delay",
-			slog.Duration("retryDelay", self.retryDelay))
-		if !timeAfter(ctx, self.retryDelay) {
-			return false
-		}
 	}
+
+	if ctx.Err() != nil {
+		l.Info("event source cancelled, shutting down")
+		return 0, false
+	}
+
+	if self.retryDelay <= 0 {
+		l.Info("end of event source, reconnect immediately")
+		return self.backoff, true
+	}
+
+	l.Info("end of event source, reconnect after delay",
+		slog.Duration("retryDelay", self.retryDelay))
+
+	if !timeAfter(ctx, self.retryDelay) {
+		l.Info("Reconnection cancelled, shutting down")
+		return 0, false
+	}
+	return self.backoff, true
 }
 
 func (self *WatchMailboxes) listen(req *http.Request,
