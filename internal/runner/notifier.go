@@ -302,11 +302,13 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 	body string, _ error,
 ) {
 	data := struct {
+		Alias   string
 		Mailbox string
 		Count   int
 		Authors string
 		Subject string
 	}{
+		Alias:   b.Alias(),
 		Mailbox: b.Mailbox,
 		Count:   thread.Count,
 		Authors: strings.Join(thread.From, ", "),
