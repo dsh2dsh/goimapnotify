@@ -40,9 +40,8 @@ func Test_notifier_renderNewMail(t *testing.T) {
 		{name: "without summary and body"},
 	}
 
-	b := model.Box{
-		Box: &config.Box{Mailbox: "Inbox"},
-	}
+	b := model.Box{Box: &config.Box{Mailbox: "Inbox"}}
+	b.WithAccount(&config.NotifyConfig{})
 
 	thread := model.Thread{
 		From:    []string{"John Doe", "Jane Doe"},

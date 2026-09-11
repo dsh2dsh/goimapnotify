@@ -1,11 +1,9 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"maps"
 	"slices"
@@ -25,8 +23,7 @@ import (
 type notifier struct {
 	ctx context.Context
 
-	summaryTemplate *template.Template
-	bodyTemplate    *template.Template
+	newMail *notificationTemplate
 
 	dbus          *dbus.Conn
 	notifier      notify.Notifier
@@ -73,24 +70,15 @@ func (self *notifier) Connect(ctx context.Context,
 }
 
 func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
-	if s := strings.TrimSpace(cfg.NewMail.Summary); s != "" {
-		t, err := template.New("").Parse(s)
-		if err != nil {
-			return fmt.Errorf("parse summary template: %w", err)
-		}
-		self.summaryTemplate = t
+	t, err := NewNotificationTemplate(cfg.NewMail)
+	if err != nil {
+		return fmt.Errorf("parse newMail notification template: %w", err)
 	}
-
-	if s := strings.TrimSpace(cfg.NewMail.Body); s != "" {
-		t, err := template.New("").Parse(s)
-		if err != nil {
-			return fmt.Errorf("parse body template: %w", err)
-		}
-		self.bodyTemplate = t
-	}
+	self.newMail = t
 
 	b := model.Box{Box: &config.Box{}}
-	_, _, err := self.renderNewMail(&b, model.Thread{})
+	b.WithAccount(&config.NotifyConfig{})
+	_, _, err = self.renderNewMail(&b, model.Thread{})
 	return err
 }
 
@@ -299,7 +287,7 @@ func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box,
 }
 
 func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
-	body string, _ error,
+	body string, err error,
 ) {
 	data := struct {
 		Alias   string
@@ -315,20 +303,9 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 		Subject: thread.Subject,
 	}
 
-	var buf bytes.Buffer
-	if t := self.summaryTemplate; t != nil {
-		if err := t.Execute(&buf, &data); err != nil {
-			return "", "", fmt.Errorf("execute summary template: %w", err)
-		}
-		summary = buf.String()
-	}
-
-	if t := self.bodyTemplate; t != nil {
-		buf.Reset()
-		if err := t.Execute(&buf, &data); err != nil {
-			return "", "", fmt.Errorf("execute body template: %w", err)
-		}
-		body = buf.String()
+	summary, body, err = self.newMail.Execute(&data)
+	if err != nil {
+		return "", "", fmt.Errorf("execute newMail template: %w", err)
 	}
 	return summary, body, nil
 }
