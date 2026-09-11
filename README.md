@@ -168,6 +168,13 @@ testing.
         {{ .Subject }}
   ```
 
+  Available template variables are:
+  - `{{ .Alias }}`
+  - `{{ .Mailbox }}`
+  - `{{ .Count }}`
+  - `{{ .Authors }}`
+  - `{{ .Subject }}`
+
   `startupNotifyUnread: true` shows one time desktop notification on start if
   this mailbox has unread mails.
 
