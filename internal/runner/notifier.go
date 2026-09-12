@@ -313,6 +313,10 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 func (self *notifier) Notify(ctx context.Context, h *handler, summary,
 	body string,
 ) error {
+	if summary == "" && body == "" {
+		return nil
+	}
+
 	n := notify.Notification{Summary: summary, Body: body}
 	if h != nil {
 		n.Actions = h.Actions()
