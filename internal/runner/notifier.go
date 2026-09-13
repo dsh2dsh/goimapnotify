@@ -23,8 +23,9 @@ import (
 type notifier struct {
 	ctx context.Context
 
-	unread  *notificationTemplate
-	newMail *notificationTemplate
+	unreadEmails *notificationTemplate
+	newMail      *notificationTemplate
+	jmapState    *notificationTemplate
 
 	dbus          *dbus.Conn
 	notifier      notify.Notifier
@@ -77,7 +78,8 @@ func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
 		parsed **notificationTemplate
 	}{
 		{"newMail", cfg.NewMail, &self.newMail},
-		{"unreadEmails", cfg.UnreadEmails, &self.unread},
+		{"unreadEmails", cfg.UnreadEmails, &self.unreadEmails},
+		{"jmapState", cfg.JmapState, &self.jmapState},
 	}
 
 	for _, tt := range templates {
@@ -91,11 +93,15 @@ func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
 	b := model.Box{Box: &config.Box{}}
 	b.WithAccount(&config.NotifyConfig{})
 
-	if _, _, err := self.renderNewMail(&b, model.Thread{}); err != nil {
+	if _, err := self.renderNewMail(&b, model.Thread{}); err != nil {
 		return err
 	}
 
-	if _, _, err := self.renderUnreadEmails(&b, 0); err != nil {
+	if _, err := self.renderUnreadEmails(&b, 0); err != nil {
+		return err
+	}
+
+	if _, err := self.renderJmapState(b.Account(), "", ""); err != nil {
 		return err
 	}
 	return nil
@@ -298,16 +304,15 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box,
 	h *handler, thread model.Thread,
 ) error {
-	summary, body, err := self.renderNewMail(b, thread)
+	n, err := self.renderNewMail(b, thread)
 	if err != nil {
 		return err
 	}
-	return self.Notify(ctx, h, summary, body)
+	return self.notify(ctx, h, n)
 }
 
-func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
-	body string, err error,
-) {
+func (self *notifier) renderNewMail(b *model.Box, thread model.Thread,
+) (notify.Notification, error) {
 	data := struct {
 		Alias   string
 		Mailbox string
@@ -322,21 +327,21 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread) (summary,
 		Subject: thread.Subject,
 	}
 
-	summary, body, err = self.newMail.Execute(&data)
+	summary, body, err := self.newMail.Execute(&data)
 	if err != nil {
-		return "", "", fmt.Errorf("execute newMail template: %w", err)
+		return notify.Notification{},
+			fmt.Errorf("execute newMail template: %w", err)
 	}
-	return summary, body, nil
+	return notify.Notification{Summary: summary, Body: body}, nil
 }
 
-func (self *notifier) Notify(ctx context.Context, h *handler, summary,
-	body string,
+func (self *notifier) notify(ctx context.Context, h *handler,
+	n notify.Notification,
 ) error {
-	if summary == "" && body == "" {
+	if n.Summary == "" && n.Body == "" {
 		return nil
 	}
 
-	n := notify.Notification{Summary: summary, Body: body}
 	if h != nil {
 		n.Actions = h.Actions()
 	}
@@ -351,7 +356,7 @@ func (self *notifier) Notify(ctx context.Context, h *handler, summary,
 }
 
 func (self *notifier) renderUnreadEmails(b *model.Box, unreadEmails uint64,
-) (summary, body string, err error) {
+) (notify.Notification, error) {
 	data := struct {
 		Alias        string
 		Mailbox      string
@@ -362,19 +367,51 @@ func (self *notifier) renderUnreadEmails(b *model.Box, unreadEmails uint64,
 		UnreadEmails: unreadEmails,
 	}
 
-	summary, body, err = self.unread.Execute(&data)
+	summary, body, err := self.unreadEmails.Execute(&data)
 	if err != nil {
-		return "", "", fmt.Errorf("execute unreadEmails template: %w", err)
+		return notify.Notification{},
+			fmt.Errorf("execute unreadEmails template: %w", err)
 	}
-	return summary, body, nil
+	return notify.Notification{Summary: summary, Body: body}, nil
 }
 
 func (self *notifier) NotifyUnreadEmails(ctx context.Context, b *model.Box,
 	h *handler, unreadEmails uint64,
 ) error {
-	summary, body, err := self.renderUnreadEmails(b, unreadEmails)
+	n, err := self.renderUnreadEmails(b, unreadEmails)
 	if err != nil {
 		return err
 	}
-	return self.Notify(ctx, h, summary, body)
+	return self.notify(ctx, h, n)
+}
+
+func (self *notifier) renderJmapState(accountConfig *config.NotifyConfig,
+	summary, body string,
+) (notify.Notification, error) {
+	data := struct {
+		Alias   string
+		Summary string
+		Body    string
+	}{
+		Alias:   accountConfig.Alias,
+		Summary: summary,
+		Body:    body,
+	}
+
+	summary, body, err := self.jmapState.Execute(&data)
+	if err != nil {
+		return notify.Notification{},
+			fmt.Errorf("execute jmapState template: %w", err)
+	}
+	return notify.Notification{Summary: summary, Body: body}, nil
+}
+
+func (self *notifier) NotifyJmapState(ctx context.Context,
+	accountConfig *config.NotifyConfig, summary, body string,
+) error {
+	n, err := self.renderJmapState(accountConfig, summary, body)
+	if err != nil {
+		return err
+	}
+	return self.notify(ctx, nil, n)
 }

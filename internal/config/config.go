@@ -42,6 +42,7 @@ type DesktopNotification struct {
 	ActionTimeout time.Duration        `yaml:"actionTimeout" validate:"min=0"`
 	NewMail       NotificationTemplate `yaml:"newMail"`
 	UnreadEmails  NotificationTemplate `yaml:"unreadEmails"`
+	JmapState     NotificationTemplate `yaml:"jmapState"`
 }
 
 type NotificationTemplate struct {

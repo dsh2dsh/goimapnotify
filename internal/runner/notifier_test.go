@@ -58,13 +58,13 @@ func Test_notifier_renderNewMail(t *testing.T) {
 				},
 			}
 
-			var n notifier
-			require.NoError(t, n.compileTemplates(cfg))
+			var nr notifier
+			require.NoError(t, nr.compileTemplates(cfg))
 
-			summary, body, err := n.renderNewMail(&b, thread)
+			nt, err := nr.renderNewMail(&b, thread)
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantSummary, summary)
-			assert.Equal(t, tt.wantBody, body)
+			assert.Equal(t, tt.wantSummary, nt.Summary)
+			assert.Equal(t, tt.wantBody, nt.Body)
 		})
 	}
 }

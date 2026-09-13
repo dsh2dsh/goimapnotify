@@ -110,31 +110,34 @@ func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
 	return nil
 }
 
-func (self *Runner) NotifyError(ctx context.Context, summary string,
-	bodyErr error,
+func (self *Runner) NotifyError(ctx context.Context,
+	accountConfig *config.NotifyConfig, summary string, bodyErr error,
 ) {
 	if self.notifier == nil {
 		return
 	}
 
 	l := logging.FromContext(ctx)
-	l.Debug("notify error state", slog.Any("error", bodyErr))
+	l.Debug("notify jmap error state", slog.Any("error", bodyErr))
 
-	err := self.notifier.Notify(ctx, nil, summary, bodyErr.Error())
+	err := self.notifier.NotifyJmapState(ctx, accountConfig, summary,
+		bodyErr.Error())
 	if err != nil {
 		l.Error("unable notify error state", slog.Any("error", err))
 	}
 }
 
-func (self *Runner) NotifyOK(ctx context.Context, summary, body string) {
+func (self *Runner) NotifyOK(ctx context.Context,
+	accountConfig *config.NotifyConfig, summary, body string,
+) {
 	if self.notifier == nil {
 		return
 	}
 
 	l := logging.FromContext(ctx)
-	l.Debug("notify OK state")
+	l.Debug("notify jmap OK state")
 
-	err := self.notifier.Notify(ctx, nil, summary, body)
+	err := self.notifier.NotifyJmapState(ctx, accountConfig, summary, body)
 	if err != nil {
 		l.Error("unable notify OK state", slog.Any("error", err))
 	}

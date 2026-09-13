@@ -176,8 +176,7 @@ testing.
   - `{{ .Subject }}`
 
   `startupNotifyUnread: true` shows one time desktop notification on start if
-  this mailbox has unread mails. Notification template can be changed. Here is
-  its default value:
+  this mailbox has unread mails. Its default template is
 
   ```yaml
   desktopNotify:
@@ -190,6 +189,20 @@ testing.
   - `{{ .Alias }}`
   - `{{ .Mailbox }}`
   - `{{ .UnreadEmails }}`
+
+  Also it shows desktop notifications for JMAP errors. Its default template is
+
+  ```yaml
+  desktopNotify:
+    jmapState:
+      summary: "{{ .Summary }}"
+      body: "{{ .Body }}"
+  ```
+
+  Available template variables are:
+  - `{{ .Alias }}`
+  - `{{ .Summary }}`
+  - `{{ .Body }}`
 
 ## Configuration
 

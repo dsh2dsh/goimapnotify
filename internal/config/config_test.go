@@ -73,6 +73,10 @@ configurations:
 			UnreadEmails: NotificationTemplate{
 				Summary: "{{ .Mailbox }} has {{ .UnreadEmails }} unread email(s)",
 			},
+			JmapState: NotificationTemplate{
+				Summary: "{{ .Summary }}",
+				Body:    "{{ .Body }}",
+			},
 		},
 		Configurations: []*NotifyConfig{
 			{
@@ -127,6 +131,10 @@ boxes: [ "INBOX" ]`
 			},
 			UnreadEmails: NotificationTemplate{
 				Summary: "{{ .Mailbox }} has {{ .UnreadEmails }} unread email(s)",
+			},
+			JmapState: NotificationTemplate{
+				Summary: "{{ .Summary }}",
+				Body:    "{{ .Body }}",
 			},
 		},
 		Configurations: []*NotifyConfig{
