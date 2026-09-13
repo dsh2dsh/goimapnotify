@@ -91,15 +91,6 @@ func (self *Runner) Close() {
 	}
 }
 
-func (self *Runner) Notify(ctx context.Context, b *model.Box, summary,
-	body string,
-) error {
-	if self.notifier == nil {
-		return nil
-	}
-	return self.notifier.Notify(ctx, self.handler(b), summary, body)
-}
-
 func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
 	threads []model.Thread,
 ) error {
@@ -147,4 +138,22 @@ func (self *Runner) NotifyOK(ctx context.Context, summary, body string) {
 	if err != nil {
 		l.Error("unable notify OK state", slog.Any("error", err))
 	}
+}
+
+func (self *Runner) NotifyUnreadEmails(ctx context.Context, b *model.Box,
+	unreadEmails uint64,
+) error {
+	if self.notifier == nil {
+		return nil
+	}
+
+	logging.FromContext(ctx).Debug("notify unread emails",
+		slog.Uint64("unreadEmails", unreadEmails))
+
+	err := self.notifier.NotifyUnreadEmails(ctx, b, self.handler(b),
+		unreadEmails)
+	if err != nil {
+		return err
+	}
+	return nil
 }

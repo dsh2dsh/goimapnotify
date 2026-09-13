@@ -33,6 +33,9 @@ func LoadBytes(b []byte) (*Configuration, error) {
 				Summary: "{{ .Mailbox }} ({{ .Count }})",
 				Body:    "<i>{{ .Authors }}</i>\n{{ .Subject }}",
 			},
+			UnreadEmails: NotificationTemplate{
+				Summary: "{{ .Mailbox }} has {{ .UnreadEmails }} unread email(s)",
+			},
 		},
 	}
 	if err := yaml.Unmarshal(b, cfg); err != nil {

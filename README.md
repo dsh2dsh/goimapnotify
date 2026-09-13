@@ -176,7 +176,20 @@ testing.
   - `{{ .Subject }}`
 
   `startupNotifyUnread: true` shows one time desktop notification on start if
-  this mailbox has unread mails.
+  this mailbox has unread mails. Notification template can be changed. Here is
+  its default value:
+
+  ```yaml
+  desktopNotify:
+    unreadEmails:
+      summary: "{{ .Mailbox }} has {{ .UnreadEmails }} unread email(s)"
+      body: ""
+  ```
+
+  Available template variables are:
+  - `{{ .Alias }}`
+  - `{{ .Mailbox }}`
+  - `{{ .UnreadEmails }}`
 
 ## Configuration
 

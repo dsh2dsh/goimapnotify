@@ -23,6 +23,7 @@ import (
 type notifier struct {
 	ctx context.Context
 
+	unread  *notificationTemplate
 	newMail *notificationTemplate
 
 	dbus          *dbus.Conn
@@ -70,16 +71,34 @@ func (self *notifier) Connect(ctx context.Context,
 }
 
 func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
-	t, err := NewNotificationTemplate(cfg.NewMail)
-	if err != nil {
-		return fmt.Errorf("parse newMail notification template: %w", err)
+	templates := []struct {
+		name   string
+		cfg    config.NotificationTemplate
+		parsed **notificationTemplate
+	}{
+		{"newMail", cfg.NewMail, &self.newMail},
+		{"unreadEmails", cfg.UnreadEmails, &self.unread},
 	}
-	self.newMail = t
+
+	for _, tt := range templates {
+		t, err := NewNotificationTemplate(tt.cfg)
+		if err != nil {
+			return fmt.Errorf("parse %s notification template: %w", tt.name, err)
+		}
+		*tt.parsed = t
+	}
 
 	b := model.Box{Box: &config.Box{}}
 	b.WithAccount(&config.NotifyConfig{})
-	_, _, err = self.renderNewMail(&b, model.Thread{})
-	return err
+
+	if _, _, err := self.renderNewMail(&b, model.Thread{}); err != nil {
+		return err
+	}
+
+	if _, _, err := self.renderUnreadEmails(&b, 0); err != nil {
+		return err
+	}
+	return nil
 }
 
 func DBusConnect(ctx context.Context) (conn *dbus.Conn,
@@ -281,7 +300,7 @@ func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box,
 ) error {
 	summary, body, err := self.renderNewMail(b, thread)
 	if err != nil {
-		return fmt.Errorf("execute new mail template: %w", err)
+		return err
 	}
 	return self.Notify(ctx, h, summary, body)
 }
@@ -329,4 +348,33 @@ func (self *notifier) Notify(ctx context.Context, h *handler, summary,
 		return fmt.Errorf("send desktop notification: %w", err)
 	}
 	return nil
+}
+
+func (self *notifier) renderUnreadEmails(b *model.Box, unreadEmails uint64,
+) (summary, body string, err error) {
+	data := struct {
+		Alias        string
+		Mailbox      string
+		UnreadEmails uint64
+	}{
+		Alias:        b.Alias(),
+		Mailbox:      b.Mailbox,
+		UnreadEmails: unreadEmails,
+	}
+
+	summary, body, err = self.unread.Execute(&data)
+	if err != nil {
+		return "", "", fmt.Errorf("execute unreadEmails template: %w", err)
+	}
+	return summary, body, nil
+}
+
+func (self *notifier) NotifyUnreadEmails(ctx context.Context, b *model.Box,
+	h *handler, unreadEmails uint64,
+) error {
+	summary, body, err := self.renderUnreadEmails(b, unreadEmails)
+	if err != nil {
+		return err
+	}
+	return self.Notify(ctx, h, summary, body)
 }

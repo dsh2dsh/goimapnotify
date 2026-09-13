@@ -70,6 +70,9 @@ configurations:
 				Summary: "{{ .Mailbox }} ({{ .Count }})",
 				Body:    "<i>{{ .Authors }}</i>\n{{ .Subject }}",
 			},
+			UnreadEmails: NotificationTemplate{
+				Summary: "{{ .Mailbox }} has {{ .UnreadEmails }} unread email(s)",
+			},
 		},
 		Configurations: []*NotifyConfig{
 			{
@@ -121,6 +124,9 @@ boxes: [ "INBOX" ]`
 			NewMail: NotificationTemplate{
 				Summary: "{{ .Mailbox }} ({{ .Count }})",
 				Body:    "<i>{{ .Authors }}</i>\n{{ .Subject }}",
+			},
+			UnreadEmails: NotificationTemplate{
+				Summary: "{{ .Mailbox }} has {{ .UnreadEmails }} unread email(s)",
 			},
 		},
 		Configurations: []*NotifyConfig{

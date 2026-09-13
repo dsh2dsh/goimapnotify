@@ -369,13 +369,7 @@ func (self *WatchMailboxes) notifyUnread(ctx context.Context) {
 			continue
 		}
 
-		l.Debug("notify unread emails",
-			slog.String("mailbox", b.Mailbox),
-			slog.Uint64("unread", m.UnreadEmails))
-
-		summary := b.Mailbox + " has " + strconv.FormatUint(m.UnreadEmails, 10) +
-			" unread email(s)"
-		err := self.runner.Notify(ctx, b, summary, "")
+		err := self.runner.NotifyUnreadEmails(ctx, b, m.UnreadEmails)
 		if err != nil {
 			l.Error("unable notify unread emails", slog.Any("error", err))
 		}
