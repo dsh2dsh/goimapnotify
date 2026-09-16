@@ -90,6 +90,8 @@ type NotifyConfig struct {
 	Password          string             `yaml:"password"`
 	PasswordCMD       *command.Templated `yaml:"passwordCMD" validate:"omitnil,validateFn"`
 	XOAuth2           bool               `yaml:"xoAuth2"`
+	OnAnyChange       *command.Templated `yaml:"onAnyChange" validate:"omitnil,validateFn"`
+	OnAnyChangePost   *command.Templated `yaml:"onAnyChangePost" validate:"omitnil,validateFn"`
 	OnNewMail         *command.Templated `yaml:"onNewMail" validate:"omitnil,validateFn"`
 	OnNewMailPost     *command.Templated `yaml:"onNewMailPost" validate:"omitnil,validateFn"`
 	OnChangedMail     *command.Templated `yaml:"onChangedMail" validate:"omitnil,validateFn"`
@@ -118,6 +120,8 @@ func (self *NotifyConfig) CompileTemplates(data any) error {
 		t    *command.Templated
 		data any
 	}{
+		{"onAnyChange", self.OnAnyChange, data},
+		{"onAnyChangePost", self.OnAnyChangePost, data},
 		{"onNewMail", self.OnNewMail, data},
 		{"onNewMailPost", self.OnNewMailPost, data},
 		{"onChangedMail", self.OnChangedMail, data},
@@ -161,6 +165,8 @@ func (self *NotifyConfig) Validate() error {
 // print informative messages
 type Box struct {
 	Mailbox           string             `yaml:"mailbox" validate:"required"`
+	OnAnyChange       *command.Templated `yaml:"onAnyChange" validate:"omitnil,validateFn"`
+	OnAnyChangePost   *command.Templated `yaml:"onAnyChangePost" validate:"omitnil,validateFn"`
 	OnNewMail         *command.Templated `yaml:"onNewMail" validate:"omitnil,validateFn"`
 	OnNewMailPost     *command.Templated `yaml:"onNewMailPost" validate:"omitnil,validateFn"`
 	OnChangedMail     *command.Templated `yaml:"onChangedMail" validate:"omitnil,validateFn"`
@@ -188,6 +194,8 @@ func (self *Box) CompileTemplates(data any) error {
 		t    *command.Templated
 		data any
 	}{
+		{"onAnyChange", self.OnAnyChange, data},
+		{"onAnyChangePost", self.OnAnyChangePost, data},
 		{"onNewMail", self.OnNewMail, data},
 		{"onNewMailPost", self.OnNewMailPost, data},
 		{"onChangedMail", self.OnChangedMail, data},

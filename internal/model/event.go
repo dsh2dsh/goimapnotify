@@ -12,10 +12,12 @@ import (
 type EventType int
 
 const (
-	EventSync EventType = iota
+	EventSync EventType = iota + 1
 	EventDeletedMail
 	EventFlagChanged
 	EventNewMail
+
+	eventAnyChange
 	idleEvents
 
 	StopWatching
@@ -31,6 +33,8 @@ func (self EventType) String() string {
 		return "Changed Flag on Email"
 	case EventNewMail:
 		return "New Email"
+	case eventAnyChange:
+		return "Any Change"
 	case StopWatching:
 		return "Stop Wathing Mailbox"
 	default:
@@ -56,15 +60,24 @@ func (self *IDLE) Alias() string { return self.box.Alias() }
 func (self *IDLE) Mailbox() string { return self.box.Mailbox }
 
 func (self *IDLE) Skip() bool {
+	if self.reason != EventSync && !self.box.SkipAnyChange() {
+		return false
+	}
+	return !self.Cmdable()
+}
+
+func (self *IDLE) Cmdable() bool {
 	switch self.reason {
 	case EventSync, EventNewMail:
-		return self.box.SkipNewMail()
+		return !self.box.SkipNewMail()
 	case EventFlagChanged:
-		return self.box.SkipChangedMail()
+		return !self.box.SkipChangedMail()
 	case EventDeletedMail:
-		return self.box.SkipDeletedMail()
+		return !self.box.SkipDeletedMail()
+	case eventAnyChange:
+		return !self.box.SkipAnyChange()
 	}
-	return true
+	return false
 }
 
 func (self *IDLE) OnReason() string {
@@ -75,6 +88,8 @@ func (self *IDLE) OnReason() string {
 		return "onDeletedMail"
 	case EventFlagChanged:
 		return "onChangedMail"
+	case eventAnyChange:
+		return "onAnyChange"
 	}
 	return "unknown reason"
 }
@@ -87,6 +102,8 @@ func (self *IDLE) OnReasonPost() string {
 		return "onDeletedMailPost"
 	case EventFlagChanged:
 		return "onChangedMailPost"
+	case eventAnyChange:
+		return "onAnyChangePost"
 	}
 	return "unknown reason"
 }
@@ -98,8 +115,19 @@ type EventSet struct {
 
 func (self *EventSet) Add(e *IDLE) {
 	self.mu.Lock()
-	self.events[e.reason] = e
-	self.mu.Unlock()
+	defer self.mu.Unlock()
+
+	if e.Cmdable() {
+		self.events[e.reason] = e
+	}
+
+	if e.Reason() == EventSync || self.events[eventAnyChange] != nil {
+		return
+	}
+
+	if !e.Box().SkipAnyChange() {
+		self.events[eventAnyChange] = NewEvent(e.Box(), eventAnyChange)
+	}
 }
 
 func (self *EventSet) Commands(ctx context.Context, l *slog.Logger,

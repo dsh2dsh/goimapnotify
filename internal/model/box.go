@@ -54,6 +54,24 @@ func (self *Box) Account() *config.NotifyConfig { return self.account }
 
 func (self *Box) Alias() string { return self.account.Alias }
 
+func (self *Box) SkipAnyChange() bool {
+	return self.OnAnyChange() == nil || self.OnAnyChange().Skip()
+}
+
+func (self *Box) OnAnyChange() *command.Templated {
+	if self.Box.OnAnyChange != nil {
+		return self.Box.OnAnyChange
+	}
+	return self.account.OnAnyChange
+}
+
+func (self *Box) OnAnyChangePost() *command.Templated {
+	if self.Box.OnAnyChangePost != nil {
+		return self.Box.OnAnyChangePost
+	}
+	return self.account.OnAnyChangePost
+}
+
 func (self *Box) SkipNewMail() bool {
 	return self.OnNewMail() == nil || self.OnNewMail().Skip()
 }
@@ -137,6 +155,11 @@ func (self *Box) buildCmd(ctx context.Context, e *IDLE, post bool,
 		t = self.OnChangedMail()
 		if post {
 			t = self.OnChangedMailPost()
+		}
+	case eventAnyChange:
+		t = self.OnAnyChange()
+		if post {
+			t = self.OnAnyChangePost()
 		}
 	default:
 		return nil, fmt.Errorf(

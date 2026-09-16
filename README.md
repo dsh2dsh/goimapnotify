@@ -204,6 +204,24 @@ testing.
   - `{{ .Summary }}`
   - `{{ .Body }}`
 
+* `onAnyChange`, `onAnyChangePost`
+
+  This option can be used together with `onNewMail`, `onChangedMail`,
+  `onDeletedMail` or instead of them. It defines a command, which runs if
+  anything changed, if it doesn't matter, what kind of change happend. If all,
+  what we need, is to run something on any mailbox change, something like:
+
+  ```yaml
+  configurations:
+    - username: "username@fastmail.com"
+      password: "long-and-secret-api-token"
+      jmap: true
+      onAnyChange: [ "mbsync", "-q", "all:{{ .Mailbox }}" ]
+      onAnyChangePost: [ "notmuch", "new", "--no-hooks", "--quiet" ]
+      boxes:
+        - mailbox: "Inbox"
+  ```
+
 ## Configuration
 
 This application is mostly compatible with the configuration of
@@ -227,8 +245,8 @@ configurations:
     xoAuth2: false
     boxes:
       - mailbox: INBOX
-        onNewMail: [ "mbsync", "examplecom:INBOX" ]
-        onChangedMail: [ "mbsync", "examplenet:INBOX" ]
+        onNewMail: [ "mbsync", "examplecom:{{ .Mailbox }}" ]
+        onChangedMail: [ "mbsync", "examplenet:{{ .Mailbox }}" ]
         onChangedMailPost: [ "SKIP" ]
         onNewMailPost: [ "SKIP" ]
 
@@ -249,14 +267,16 @@ configurations:
     onChangedMailPost: []
     onDeletedMail: []
     onDeletedMailPost: []
+    onAnyChange: []
+    onAnyChangePost: []
     boxes:
       - mailbox: INBOX
-        onNewMail: [ "mbsync", "examplenet:INBOX" ]
+        onNewMail: [ "mbsync", "examplenet:{{ .Mailbox }}" ]
         onNewMailPost: [ "SKIP" ]
-        onChangedMail: [ "mbsync", "examplenet:INBOX" ]
+        onChangedMail: [ "mbsync", "examplenet:{{ .Mailbox }}" ]
 
       - mailbox: Junk
-        onNewMail: [ "mbsync", "examplenet:Junk" ]
+        onNewMail: [ "mbsync", "examplenet:{{ .Mailbox }}" ]
         onNewMailPost: [ "SKIP" ]
 ```
 
@@ -277,6 +297,10 @@ from your IMAP or JMAP server.
 
 - `onDeletedMailPost`: is an executable or script to run after `onDeletedMail`
   has ran.
+
+- `onAnyChange`: this command runs when anything changed.
+
+- `onAnyChangePost`: this command runs after `onAnyChange`.
 
 - `hostCMD`: is an executable or script that retrieves your host from somewhere,
   we cannot pass arguments to this command from `Stdin`.

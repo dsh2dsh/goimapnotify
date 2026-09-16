@@ -43,6 +43,7 @@ configurations:
     tls: true
     username: "username@localhost"
     password: "abrakadabra"
+    onAnyChange: [ "imapnotify.sh", "{{ .Mailbox }}" ]
     onNewMail: [ "imapnotify.sh", "{{ .Mailbox }}" ]
     boxes:
       - mailbox: "INBOX"
@@ -80,12 +81,13 @@ configurations:
 		},
 		Configurations: []*NotifyConfig{
 			{
-				Host:      "localhost",
-				Port:      993,
-				TLS:       true,
-				Username:  "username@localhost",
-				Password:  "abrakadabra",
-				OnNewMail: &command.Templated{},
+				Host:        "localhost",
+				Port:        993,
+				TLS:         true,
+				Username:    "username@localhost",
+				Password:    "abrakadabra",
+				OnAnyChange: &command.Templated{},
+				OnNewMail:   &command.Templated{},
 				Boxes: []*Box{
 					{
 						Mailbox:       "INBOX",
