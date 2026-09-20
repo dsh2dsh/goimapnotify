@@ -39,6 +39,7 @@ func showTestNotification() error {
 	b := model.Box{
 		Box: &config.Box{Mailbox: "Inbox"},
 	}
+	b.WithAccount(&config.NotifyConfig{Alias: "username@localhost"})
 
 	threads := []model.Thread{
 		{
