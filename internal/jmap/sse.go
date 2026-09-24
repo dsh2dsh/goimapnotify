@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"git.sr.ht/~rockorager/go-jmap"
@@ -75,12 +76,35 @@ func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 	}
 
 	if err := scanner.Err(); err != nil {
-		if !errors.Is(err, context.Canceled) {
+		switch {
+		case errors.Is(err, context.Canceled):
+		case http2GoAwayNoError(err):
+		default:
 			yield(nil, fmt.Errorf("read event: %w", err))
 		}
-	} else if b.Len() != 0 {
+		return
+	}
+
+	if b.Len() != 0 {
 		yield(nil, fmt.Errorf("read event: %w", io.ErrUnexpectedEOF))
 	}
+}
+
+func http2GoAwayNoError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Unfortunately GoAwayError defined in net/http/internal/http2/transport.go
+	// isn't public and all what I have is its error string.
+	const http2GoAway = "http2: server sent GOAWAY and closed the connection;"
+	const errCodeNoError = ", ErrCode=NO_ERROR,"
+
+	after, ok := strings.CutPrefix(err.Error(), http2GoAway)
+	if !ok {
+		return false
+	}
+	return strings.Contains(after, errCodeNoError)
 }
 
 func (self *WatchMailboxes) dispatchEvent(ctx context.Context, eventType string,
