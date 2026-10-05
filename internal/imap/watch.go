@@ -125,6 +125,9 @@ func (w *WatchMailBox) Watch() {
 			_, ok = update.(*client.ExpungeUpdate)
 			if ok {
 				// messages deleted
+				if w.box.ExistingEmail > 0 {
+					w.box.ExistingEmail--
+				}
 				w.idleEvent <- IDLEEvent{
 					Alias:   w.box.Alias,
 					Mailbox: w.box.Mailbox,
