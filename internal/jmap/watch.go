@@ -211,12 +211,9 @@ func (self *WatchMailboxes) queryEmails(ctx context.Context) error {
 			return fmt.Errorf("query Emails: %w", err)
 		}
 
-		q, ok := resp.Responses[0].Args.(*email.QueryResponse)
-		if !ok {
-			return fmt.Errorf("unexpected jmap response[0]: %T",
-				resp.Responses[0].Args)
-		} else if len(q.IDs) == 0 {
-			break
+		q, err := methodResponse[email.QueryResponse](resp.Responses[0])
+		if err != nil {
+			return fmt.Errorf("%s: %w", req.Calls[0].Name, err)
 		}
 
 		if queryState == "" {
@@ -232,10 +229,9 @@ func (self *WatchMailboxes) queryEmails(ctx context.Context) error {
 			continue
 		}
 
-		r, ok := resp.Responses[1].Args.(*email.GetResponse)
-		if !ok {
-			return fmt.Errorf("unexpected jmap response[1]: %T",
-				resp.Responses[1].Args)
+		r, err := methodResponse[email.GetResponse](resp.Responses[1])
+		if err != nil {
+			return fmt.Errorf("%s: %w", req.Calls[1].Name, err)
 		}
 
 		emailsCount += self.jmapBoxes.AddEmails(r.List)
@@ -246,7 +242,7 @@ func (self *WatchMailboxes) queryEmails(ctx context.Context) error {
 			slog.String("state", r.State))
 		self.emailState = r.State
 
-		if len(q.IDs) != int(q.Limit) {
+		if n := len(q.IDs); n == 0 || n != int(q.Limit) {
 			break
 		}
 
@@ -579,10 +575,9 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 		return false, err
 	}
 
-	r, ok := resp.Responses[0].Args.(*email.ChangesResponse)
-	if !ok {
-		return false, fmt.Errorf("unexpected jmap response[0]: %T",
-			resp.Responses[0].Args)
+	r, err := methodResponse[email.ChangesResponse](resp.Responses[0])
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", req.Calls[0].Name, err)
 	}
 
 	logging.FromContext(ctx).Debug("got Email changes",
@@ -599,10 +594,9 @@ func (self *WatchMailboxes) fetchEmailChanges(ctx context.Context,
 	}
 
 	for i, fn := range notifiers {
-		r, ok := resp.Responses[i+1].Args.(*email.GetResponse)
-		if !ok {
-			return false, fmt.Errorf("unexpected jmap response[%d]: %T", i+1,
-				resp.Responses[i+1].Args)
+		r, err := methodResponse[email.GetResponse](resp.Responses[i+1])
+		if err != nil {
+			return false, fmt.Errorf("%s[%d]: %w", req.Calls[i+1].Name, i+1, err)
 		}
 		fn(ctx, r.List)
 	}

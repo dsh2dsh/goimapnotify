@@ -145,16 +145,25 @@ func (self *client) Mailboxes(ctx context.Context) (*mailboxes, error) {
 		return nil, fmt.Errorf("list Mailboxes: %w", err)
 	}
 
-	r, ok := resp.Responses[0].Args.(*mailbox.GetResponse)
-	if !ok {
-		return nil, fmt.Errorf("unexpected JMAP response %T",
-			resp.Responses[0].Args)
+	r, err := methodResponse[mailbox.GetResponse](resp.Responses[0])
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", req.Calls[0].Name, err)
 	}
 	return NewMailboxes(r), nil
 }
 
 func (self *client) AccountId() jmap.ID {
 	return self.Session.PrimaryAccounts[mail.URI]
+}
+
+func methodResponse[E any](resp *jmap.Invocation) (*E, error) {
+	switch v := resp.Args.(type) {
+	case *E:
+		return v, nil
+	case *jmap.MethodError:
+		return nil, fmt.Errorf("jmap method %s: %w", resp.Name, v)
+	}
+	return nil, fmt.Errorf("unexpected jmap response type: %T", resp.Args)
 }
 
 func (self *client) Account() jmap.Account {
