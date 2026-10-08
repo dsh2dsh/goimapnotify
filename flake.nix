@@ -67,7 +67,7 @@
         {
           default = pkgs.buildGoModule {
             pname = "goimapnotify";
-            version = "2.5.7";
+            version = "2.5.9";
 
             src = builtins.path {
               path = ./.;
@@ -75,7 +75,7 @@
             };
 
             modSha256 = "sha256-5cZzaCoOR1R7iST0q3GaJbYIbKKEigeWqhp87maOL04=";
-            vendorHash = "sha256-5cZzaCoOR1R7iST0q3GaJbYIbKKEigeWqhp87maOL04=";
+            vendorHash = null;
 
             postPatch = ''
               for f in internal/util/command.go internal/util/command_test.go; do

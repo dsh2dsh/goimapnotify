@@ -2,6 +2,15 @@
 ## [Unreleased]
 
 
+<a name="2.5.9"></a>
+## [2.5.9] - 2026-10-06
+### Features
+- Activate Radicle CI for this repository
+
+### Fixes
+- Report new mail after messages are removed from the mailbox
+
+
 <a name="2.5.8"></a>
 ## [2.5.8] - 2026-08-18
 ### Fixes
@@ -178,7 +187,8 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.8...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.9...HEAD
+[2.5.9]: https://gitlab.com/shackra/goimapnotify/compare/2.5.8...2.5.9
 [2.5.8]: https://gitlab.com/shackra/goimapnotify/compare/2.5.7...2.5.8
 [2.5.7]: https://gitlab.com/shackra/goimapnotify/compare/2.5.6...2.5.7
 [2.5.6]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...2.5.6
