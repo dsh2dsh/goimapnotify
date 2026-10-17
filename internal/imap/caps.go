@@ -13,8 +13,8 @@ func AllCaps(c *imapclient.Client) []string {
 	}
 
 	sortedCaps := make([]string, 0, len(caps))
-	for cap := range caps {
-		sortedCaps = append(sortedCaps, string(cap))
+	for icap := range caps {
+		sortedCaps = append(sortedCaps, string(icap))
 	}
 	slices.Sort(sortedCaps)
 	return sortedCaps
