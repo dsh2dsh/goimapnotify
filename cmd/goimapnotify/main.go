@@ -50,7 +50,7 @@ var (
 const (
 	defaultConnectivityHosts = []string{
 		"digicert.com:80",
-		"cpanel.net:80",
+		"cpanel.net:443",
 		"avast.com:80",
 		"unity3d.com:80",
 		"linkedin.com:80",
