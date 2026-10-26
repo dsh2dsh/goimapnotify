@@ -47,6 +47,17 @@ var (
 	branch string
 )
 
+const (
+	defaultConnectivityHosts = []string{
+		"digicert.com:80",
+		"cpanel.net:80",
+		"avast.com:80",
+		"unity3d.com:80",
+		"linkedin.com:80",
+		"wiley.com:80",
+	}
+)
+
 func init() {
 	// Set the version for the imap package
 	imap.Version = gittag
@@ -342,7 +353,7 @@ func main() {
 		if len(topConfig.ConnectivityHosts) > 0 {
 			connectivityAddrs = topConfig.ConnectivityHosts
 		} else {
-			connectivityAddrs = []string{"archlinux.org:80", "ubuntu.com:80"}
+			connectivityAddrs = defaultConnectivityHosts
 		}
 		hosts := make([]netmon.HostPort, 0, len(connectivityAddrs))
 		for _, addr := range connectivityAddrs {
