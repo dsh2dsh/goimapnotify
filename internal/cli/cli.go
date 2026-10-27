@@ -207,6 +207,8 @@ accountLoop:
 			break
 		}
 
+		running.WithBoxes(account.Boxes)
+
 		if account.JMAP {
 			wb := jmap.NewWatchMailboxes(account.Boxes, events, running).
 				WithStartupSync(topConfig.StartupSync)

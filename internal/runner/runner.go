@@ -33,7 +33,6 @@ type Runner struct {
 	maxWait  time.Duration
 	notifier *notifier
 
-	mu       sync.Mutex
 	handlers map[*model.Box]*handler
 	wg       sync.WaitGroup
 }
@@ -60,27 +59,22 @@ func (self *Runner) EnableDesktopNotifications(ctx context.Context,
 	return nil
 }
 
+func (self *Runner) WithBoxes(boxes []*model.Box) *Runner {
+	for _, b := range boxes {
+		h := NewHandler(b, self.wait).WithMaxDelay(self.maxWait)
+		if self.notifier != nil {
+			h.WithNotifier(self.notifier)
+		}
+		self.handlers[b] = h
+	}
+	return self
+}
+
 func (self *Runner) Schedule(ctx context.Context, e *model.IDLE) {
-	h := self.handler(e.Box())
+	h := self.handlers[e.Box()]
 	if h.Schedule(e) {
 		self.wg.Go(func() { h.Run(ctx) })
 	}
-}
-
-func (self *Runner) handler(b *model.Box) *handler {
-	self.mu.Lock()
-	defer self.mu.Unlock()
-
-	if h, ok := self.handlers[b]; ok {
-		return h
-	}
-
-	h := NewHandler(b, self.wait).WithMaxDelay(self.maxWait)
-	if self.notifier != nil {
-		h.WithNotifier(self.notifier)
-	}
-	self.handlers[b] = h
-	return h
 }
 
 func (self *Runner) Wait() { self.wg.Wait() }
@@ -101,7 +95,7 @@ func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
 	logging.FromContext(ctx).Debug("notify new mails",
 		slog.Int("threads", len(threads)))
 
-	h := self.handler(b)
+	h := self.handlers[b]
 	for _, thread := range threads {
 		if err := self.notifier.NotifyNewMail(ctx, b, h, thread); err != nil {
 			return err
@@ -153,7 +147,7 @@ func (self *Runner) NotifyUnreadEmails(ctx context.Context, b *model.Box,
 	logging.FromContext(ctx).Debug("notify unread emails",
 		slog.Uint64("unreadEmails", unreadEmails))
 
-	err := self.notifier.NotifyUnreadEmails(ctx, b, self.handler(b),
+	err := self.notifier.NotifyUnreadEmails(ctx, b, self.handlers[b],
 		unreadEmails)
 	if err != nil {
 		return err

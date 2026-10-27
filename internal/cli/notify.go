@@ -36,10 +36,9 @@ func showTestNotification() error {
 		return fmt.Errorf("trying to enable desktop notifications: %w", err)
 	}
 
-	b := model.Box{
-		Box: &config.Box{Mailbox: "Inbox"},
-	}
+	b := model.Box{Box: &config.Box{Mailbox: "Inbox"}}
 	b.WithAccount(&config.NotifyConfig{Alias: "username@localhost"})
+	running.WithBoxes([]*model.Box{&b})
 
 	threads := []model.Thread{
 		{
