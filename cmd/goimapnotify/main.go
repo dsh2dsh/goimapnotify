@@ -45,9 +45,7 @@ var (
 	commit string
 	gittag string
 	branch string
-)
 
-const (
 	defaultConnectivityHosts = []string{
 		"digicert.com:80",
 		"cpanel.net:443",
