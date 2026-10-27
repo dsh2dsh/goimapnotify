@@ -183,29 +183,31 @@ func TestLegacyConverter(t *testing.T) {
 			RejectUnauthorized: boolPtr(true),
 			STARTTLS:           false,
 		},
-		IDLELogoutTimeout: 30,
-		EnableIDCommand:   true,
-		Username:          "user@example.com",
-		UsernameCMD:       "echo user@example.com",
-		Password:          "secret",
-		PasswordCMD:       "pass show email",
-		XOAuth2:           true,
-		OnNewMail:         "mbsync -a",
-		OnNewMailPost:     "notmuch new",
-		OnChangedMail:     "echo changed",
-		OnChangedMailPost: "echo changed post",
-		OnDeletedMail:     "echo deleted",
-		OnDeletedMailPost: "echo deleted post",
-		Boxes:             []string{"INBOX", "Sent", "Drafts"},
+		IDLELogoutTimeout:    30,
+		EnableIDCommand:      true,
+		Username:             "user@example.com",
+		UsernameCMD:          "echo user@example.com",
+		Password:             "secret",
+		PasswordCMD:          "pass show email",
+		XOAuth2:              true,
+		OnNewMail:            "mbsync -a",
+		OnNewMailPost:        "notmuch new",
+		OnChangedMail:        "echo changed",
+		OnChangedMailPost:    "echo changed post",
+		OnDeletedMail:        "echo deleted",
+		OnDeletedMailPost:    "echo deleted post",
+		Boxes:                []string{"INBOX", "Sent", "Drafts"},
+		NetworkCheckInterval: 60,
+		ConnectivityHosts:    []string{"google.com", "example.com"},
 	}
 
 	result := LegacyConverter(legacy)
 
-	if len(result) != 1 {
-		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result))
+	if len(result.Configurations) != 1 {
+		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result.Configurations))
 	}
 
-	conf := result[0]
+	conf := result.Configurations[0]
 
 	// Verify all fields are copied correctly
 	if conf.Host != legacy.Host {
@@ -292,6 +294,27 @@ func TestLegacyConverter(t *testing.T) {
 			t.Errorf("Boxes[%d].Mailbox = %q, want %q", i, box.Mailbox, legacy.Boxes[i])
 		}
 	}
+
+	// Verify the new top-level fields are copied correctly
+	if result.NetworkCheckInterval != legacy.NetworkCheckInterval {
+		t.Errorf(
+			"NetworkCheckInterval = %d, want %d",
+			result.NetworkCheckInterval,
+			legacy.NetworkCheckInterval,
+		)
+	}
+	if len(result.ConnectivityHosts) != len(legacy.ConnectivityHosts) {
+		t.Fatalf(
+			"ConnectivityHosts length = %d, want %d",
+			len(result.ConnectivityHosts),
+			len(legacy.ConnectivityHosts),
+		)
+	}
+	for i, host := range result.ConnectivityHosts {
+		if host != legacy.ConnectivityHosts[i] {
+			t.Errorf("ConnectivityHosts[%d] = %q, want %q", i, host, legacy.ConnectivityHosts[i])
+		}
+	}
 }
 
 // TestLegacyConverter_EmptyBoxes tests LegacyConverter with no boxes
@@ -304,12 +327,12 @@ func TestLegacyConverter_EmptyBoxes(t *testing.T) {
 
 	result := LegacyConverter(legacy)
 
-	if len(result) != 1 {
-		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result))
+	if len(result.Configurations) != 1 {
+		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result.Configurations))
 	}
 
-	if len(result[0].Boxes) != 0 {
-		t.Errorf("Boxes length = %d, want 0", len(result[0].Boxes))
+	if len(result.Configurations[0].Boxes) != 0 {
+		t.Errorf("Boxes length = %d, want 0", len(result.Configurations[0].Boxes))
 	}
 }
 
@@ -319,12 +342,12 @@ func TestLegacyConverter_MinimalConfig(t *testing.T) {
 
 	result := LegacyConverter(legacy)
 
-	if len(result) != 1 {
-		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result))
+	if len(result.Configurations) != 1 {
+		t.Fatalf("LegacyConverter() returned %d configs, want 1", len(result.Configurations))
 	}
 
 	// All fields should be zero values
-	conf := result[0]
+	conf := result.Configurations[0]
 	if conf.Host != "" {
 		t.Errorf("Host = %q, want empty", conf.Host)
 	}

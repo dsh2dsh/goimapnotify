@@ -55,25 +55,27 @@ type Configuration struct {
 
 // ConfigurationLegacy holds the old configuration format
 type ConfigurationLegacy struct {
-	Host              string           `yaml:"host"              json:"host"`
-	HostCMD           string           `yaml:"hostCMD"           json:"hostCMD"`
-	Port              int              `yaml:"port"              json:"port"`
-	TLS               bool             `yaml:"tls"               json:"tls"`
-	TLSOptions        TLSOptionsStruct `yaml:"tlsOptions"        json:"tlsOptions"`
-	IDLELogoutTimeout int              `yaml:"idleLogoutTimeout" json:"idleLogoutTimeout"`
-	EnableIDCommand   bool             `yaml:"enableIDCommand"   json:"enableIDCommand"`
-	Username          string           `yaml:"username"          json:"username"`
-	UsernameCMD       string           `yaml:"usernameCMD"       json:"usernameCMD"`
-	Password          string           `yaml:"password"          json:"password"`
-	PasswordCMD       string           `yaml:"passwordCMD"       json:"passwordCMD"`
-	XOAuth2           bool             `yaml:"xoAuth2"           json:"xoAuth2"`
-	OnNewMail         string           `yaml:"onNewMail"         json:"onNewMail"`
-	OnNewMailPost     string           `yaml:"onNewMailPost"     json:"onNewMailPost"`
-	OnChangedMail     string           `yaml:"onChangedMail"     json:"onChangedMail"`
-	OnChangedMailPost string           `yaml:"onChangedMailPost" json:"onChangedMailPost"`
-	OnDeletedMail     string           `yaml:"onDeletedMail"     json:"onDeletedMail"`
-	OnDeletedMailPost string           `yaml:"onDeletedMailPost" json:"onDeletedMailPost"`
-	Boxes             []string         `yaml:"boxes"             json:"boxes"`
+	Host                 string           `yaml:"host"                 json:"host"`
+	HostCMD              string           `yaml:"hostCMD"              json:"hostCMD"`
+	Port                 int              `yaml:"port"                 json:"port"`
+	TLS                  bool             `yaml:"tls"                  json:"tls"`
+	TLSOptions           TLSOptionsStruct `yaml:"tlsOptions"           json:"tlsOptions"`
+	IDLELogoutTimeout    int              `yaml:"idleLogoutTimeout"    json:"idleLogoutTimeout"`
+	EnableIDCommand      bool             `yaml:"enableIDCommand"      json:"enableIDCommand"`
+	Username             string           `yaml:"username"             json:"username"`
+	UsernameCMD          string           `yaml:"usernameCMD"          json:"usernameCMD"`
+	Password             string           `yaml:"password"             json:"password"`
+	PasswordCMD          string           `yaml:"passwordCMD"          json:"passwordCMD"`
+	XOAuth2              bool             `yaml:"xoAuth2"              json:"xoAuth2"`
+	OnNewMail            string           `yaml:"onNewMail"            json:"onNewMail"`
+	OnNewMailPost        string           `yaml:"onNewMailPost"        json:"onNewMailPost"`
+	OnChangedMail        string           `yaml:"onChangedMail"        json:"onChangedMail"`
+	OnChangedMailPost    string           `yaml:"onChangedMailPost"    json:"onChangedMailPost"`
+	OnDeletedMail        string           `yaml:"onDeletedMail"        json:"onDeletedMail"`
+	OnDeletedMailPost    string           `yaml:"onDeletedMailPost"    json:"onDeletedMailPost"`
+	Boxes                []string         `yaml:"boxes"                json:"boxes"`
+	NetworkCheckInterval int              `yaml:"networkCheckInterval" json:"networkCheckInterval"`
+	ConnectivityHosts    []string         `yaml:"connectivityHosts"    json:"connectivityHosts"`
 }
 
 // NotifyConfig holds the configuration for a single account
@@ -158,8 +160,7 @@ func CompileTemplate(i string) error {
 }
 
 // LegacyConverter converts old format configuration to new format
-func LegacyConverter(conf ConfigurationLegacy) []NotifyConfig {
-	var r []NotifyConfig
+func LegacyConverter(conf ConfigurationLegacy) Configuration {
 	var c NotifyConfig
 	c.Host = conf.Host
 	c.HostCMD = conf.HostCMD
@@ -182,7 +183,12 @@ func LegacyConverter(conf ConfigurationLegacy) []NotifyConfig {
 	for _, mailbox := range conf.Boxes {
 		c.Boxes = append(c.Boxes, Box{Mailbox: mailbox})
 	}
-	return append(r, c)
+
+	return Configuration{
+		Configurations:       []NotifyConfig{c},
+		NetworkCheckInterval: conf.NetworkCheckInterval,
+		ConnectivityHosts:    conf.ConnectivityHosts,
+	}
 }
 
 // SetFromConfig inherits config values to Box and validates templates

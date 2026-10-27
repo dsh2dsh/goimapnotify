@@ -98,7 +98,7 @@ func loadConfiguration(path string, retries int) (*config.Configuration, error) 
 		}
 
 		logrus.Info("legacy format configuration detected")
-		topConfiguration.Configurations = config.LegacyConverter(legacy)
+		topConfiguration = config.LegacyConverter(legacy)
 	}
 
 	if len(topConfiguration.Configurations) > 0 &&
