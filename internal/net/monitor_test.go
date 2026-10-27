@@ -181,3 +181,86 @@ func TestNetworkMonitor_QuitStopsMonitor(t *testing.T) {
 		t.Fatal("monitor did not stop after quit")
 	}
 }
+
+func TestNetworkMonitor_ProbeAll(t *testing.T) {
+	// Two reachable listeners that stay open for the duration of the test.
+	ln1 := startListener(t)
+	defer ln1.Close()
+	ln2 := startListener(t)
+	defer ln2.Close()
+
+	reachable1 := hostPortFromListener(ln1)
+	reachable2 := hostPortFromListener(ln2)
+	unreachable := HostPort{Host: "127.0.0.1", Port: 1} // port 1 should refuse
+
+	tests := []struct {
+		name          string
+		hosts         []HostPort
+		wantUp        bool
+		wantTotal     int
+		wantReachable int
+	}{
+		{
+			name:          "no hosts",
+			hosts:         nil,
+			wantUp:        true,
+			wantTotal:     0,
+			wantReachable: 0,
+		},
+		{
+			name:          "single reachable host",
+			hosts:         []HostPort{reachable1},
+			wantUp:        true,
+			wantTotal:     1,
+			wantReachable: 1,
+		},
+		{
+			name:          "single unreachable host",
+			hosts:         []HostPort{unreachable},
+			wantUp:        false,
+			wantTotal:     1,
+			wantReachable: 0,
+		},
+		{
+			name:          "two hosts both reachable",
+			hosts:         []HostPort{reachable1, reachable2},
+			wantUp:        true,
+			wantTotal:     2,
+			wantReachable: 2,
+		},
+		{
+			name:          "two hosts one reachable",
+			hosts:         []HostPort{reachable1, unreachable},
+			wantUp:        false,
+			wantTotal:     2,
+			wantReachable: 1,
+		},
+		{
+			name:          "three hosts majority reached",
+			hosts:         []HostPort{reachable1, reachable2, unreachable},
+			wantUp:        true,
+			wantTotal:     3,
+			wantReachable: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &NetworkMonitor{
+				hosts:   tt.hosts,
+				timeout: time.Second,
+			}
+
+			isUp, total, reachable := m.probeAll()
+			if isUp != tt.wantUp {
+				t.Errorf("isUp = %v, want %v", isUp, tt.wantUp)
+			}
+			if total != tt.wantTotal {
+				t.Errorf("total = %d, want %d", total, tt.wantTotal)
+			}
+			if reachable != tt.wantReachable {
+				t.Errorf("reachable = %d, want %d", reachable, tt.wantReachable)
+			}
+		})
+	}
+}

@@ -88,13 +88,17 @@ func (m *NetworkMonitor) run() {
 	for {
 		select {
 		case <-ticker.C:
-			isUp := m.probeAll()
+			isUp, total, reachable := m.probeAll()
 			if wasUp && !isUp {
-				logrus.Warn("Network connectivity lost, IMAP host(s) unreachable")
+				logrus.Warnf(
+					"Network connectivity lost, only %d out of %d host(s) reachable",
+					reachable,
+					total,
+				)
 				m.eventCh <- NetworkEvent{State: NetworkDown}
 				wasUp = false
 			} else if !wasUp && isUp {
-				logrus.Info("Network restored, IMAP host(s) reachable again")
+				logrus.Info("Network restored, probe hosts are reachable again")
 				m.eventCh <- NetworkEvent{State: NetworkUp}
 				wasUp = true
 			}
@@ -104,10 +108,12 @@ func (m *NetworkMonitor) run() {
 	}
 }
 
-// probeAll returns true if a majority of hosts are reachable via TCP
-func (m *NetworkMonitor) probeAll() bool {
+// probeAll probes every configured host over TCP and returns whether
+// a majority of them are reachable, the total number of hosts, and
+// the number of hosts that were reachable.
+func (m *NetworkMonitor) probeAll() (bool, int, int) {
 	if len(m.hosts) == 0 {
-		return true
+		return true, 0, 0
 	}
 
 	reachable := 0
@@ -123,5 +129,5 @@ func (m *NetworkMonitor) probeAll() bool {
 	}
 
 	majority := len(m.hosts)/2 + 1
-	return reachable >= majority
+	return reachable >= majority, len(m.hosts), reachable
 }
