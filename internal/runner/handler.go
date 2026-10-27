@@ -253,3 +253,7 @@ func (self *handler) Alias() string { return self.box.Alias() }
 func (self *handler) Mailbox() string { return self.box.Mailbox }
 
 func (self *handler) Actions() []notify.Action { return self.notifyActions }
+
+func (self *handler) Box() *model.Box { return self.box }
+
+func (self *handler) Notifier() *notifier { return self.notifier }

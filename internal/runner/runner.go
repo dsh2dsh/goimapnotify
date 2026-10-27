@@ -97,7 +97,11 @@ func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
 
 	h := self.handlers[b]
 	for _, thread := range threads {
-		if err := self.notifier.NotifyNewMail(ctx, b, h, thread); err != nil {
+		n, err := NewNewMail(h, thread)
+		if err != nil {
+			return err
+		}
+		if err := n.Send(ctx); err != nil {
 			return err
 		}
 	}
@@ -114,9 +118,14 @@ func (self *Runner) NotifyError(ctx context.Context,
 	l := logging.FromContext(ctx)
 	l.Debug("notify jmap error state", slog.Any("error", bodyErr))
 
-	err := self.notifier.NotifyJmapState(ctx, accountConfig, summary,
+	n, err := NewErrorNotification(self.notifier, accountConfig, summary,
 		bodyErr.Error())
 	if err != nil {
+		l.Error("unable notify error state", slog.Any("error", err))
+		return
+	}
+
+	if err := n.Send(ctx); err != nil {
 		l.Error("unable notify error state", slog.Any("error", err))
 	}
 }
@@ -131,8 +140,13 @@ func (self *Runner) NotifyOK(ctx context.Context,
 	l := logging.FromContext(ctx)
 	l.Debug("notify jmap OK state")
 
-	err := self.notifier.NotifyJmapState(ctx, accountConfig, summary, body)
+	n, err := NewErrorNotification(self.notifier, accountConfig, summary, body)
 	if err != nil {
+		l.Error("unable notify OK state", slog.Any("error", err))
+		return
+	}
+
+	if err := n.Send(ctx); err != nil {
 		l.Error("unable notify OK state", slog.Any("error", err))
 	}
 }
@@ -147,9 +161,12 @@ func (self *Runner) NotifyUnreadEmails(ctx context.Context, b *model.Box,
 	logging.FromContext(ctx).Debug("notify unread emails",
 		slog.Uint64("unreadEmails", unreadEmails))
 
-	err := self.notifier.NotifyUnreadEmails(ctx, b, self.handlers[b],
-		unreadEmails)
+	n, err := NewUnreadEmails(self.handlers[b], unreadEmails)
 	if err != nil {
+		return err
+	}
+
+	if err := n.Send(ctx); err != nil {
 		return err
 	}
 	return nil

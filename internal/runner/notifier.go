@@ -16,7 +16,6 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/dsh2dsh/goimapnotify/internal/config"
-	"github.com/dsh2dsh/goimapnotify/internal/logging"
 	"github.com/dsh2dsh/goimapnotify/internal/model"
 )
 
@@ -101,7 +100,7 @@ func (self *notifier) compileTemplates(cfg config.DesktopNotification) error {
 		return err
 	}
 
-	if _, err := self.renderJmapState(b.Account(), "", ""); err != nil {
+	if _, err := self.renderErrorState(b.Account(), "", ""); err != nil {
 		return err
 	}
 	return nil
@@ -301,16 +300,6 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 	return nil
 }
 
-func (self *notifier) NotifyNewMail(ctx context.Context, b *model.Box,
-	h *handler, thread model.Thread,
-) error {
-	n, err := self.renderNewMail(b, thread)
-	if err != nil {
-		return err
-	}
-	return self.notify(ctx, h, n)
-}
-
 func (self *notifier) renderNewMail(b *model.Box, thread model.Thread,
 ) (notify.Notification, error) {
 	data := struct {
@@ -335,26 +324,6 @@ func (self *notifier) renderNewMail(b *model.Box, thread model.Thread,
 	return notify.Notification{Summary: summary, Body: body}, nil
 }
 
-func (self *notifier) notify(ctx context.Context, h *handler,
-	n notify.Notification,
-) error {
-	if n.Summary == "" && n.Body == "" {
-		return nil
-	}
-
-	if h != nil {
-		n.Actions = h.Actions()
-	}
-
-	l := logging.FromContext(ctx)
-	l.Debug("send desktop notification")
-
-	if err := self.Send(n, h, l); err != nil {
-		return fmt.Errorf("send desktop notification: %w", err)
-	}
-	return nil
-}
-
 func (self *notifier) renderUnreadEmails(b *model.Box, unreadEmails uint64,
 ) (notify.Notification, error) {
 	data := struct {
@@ -375,17 +344,7 @@ func (self *notifier) renderUnreadEmails(b *model.Box, unreadEmails uint64,
 	return notify.Notification{Summary: summary, Body: body}, nil
 }
 
-func (self *notifier) NotifyUnreadEmails(ctx context.Context, b *model.Box,
-	h *handler, unreadEmails uint64,
-) error {
-	n, err := self.renderUnreadEmails(b, unreadEmails)
-	if err != nil {
-		return err
-	}
-	return self.notify(ctx, h, n)
-}
-
-func (self *notifier) renderJmapState(accountConfig *config.NotifyConfig,
+func (self *notifier) renderErrorState(accountConfig *config.NotifyConfig,
 	summary, body string,
 ) (notify.Notification, error) {
 	data := struct {
@@ -404,14 +363,4 @@ func (self *notifier) renderJmapState(accountConfig *config.NotifyConfig,
 			fmt.Errorf("execute jmapState template: %w", err)
 	}
 	return notify.Notification{Summary: summary, Body: body}, nil
-}
-
-func (self *notifier) NotifyJmapState(ctx context.Context,
-	accountConfig *config.NotifyConfig, summary, body string,
-) error {
-	n, err := self.renderJmapState(accountConfig, summary, body)
-	if err != nil {
-		return err
-	}
-	return self.notify(ctx, nil, n)
 }
