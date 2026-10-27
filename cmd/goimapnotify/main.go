@@ -385,9 +385,10 @@ func main() {
 	for idleForever {
 		select {
 		case netEvent := <-netChan:
-			if netEvent.State == netmon.NetworkDown {
+			switch netEvent.State {
+			case netmon.NetworkDown:
 				networkDown = true
-			} else if netEvent.State == netmon.NetworkUp {
+			case netmon.NetworkUp:
 				networkDown = false
 				if len(pendingReconnects) > 0 {
 					logrus.Infof(
