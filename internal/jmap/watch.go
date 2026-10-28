@@ -85,16 +85,16 @@ func (self *WatchMailboxes) Connect(ctx context.Context, retries int) error {
 
 	if err := self.connect(ctx); err != nil {
 		if unableWatch(err) {
-			self.runner.NotifyError(ctx, self.accountConfig(),
-				"Initial connection failed, can't retry", err)
+			self.runner.NotifyState(ctx, self.accountConfig(),
+				"Initial connection failed, can't retry", err.Error())
 			return err
 		}
 
 		logging.FromContext(ctx).Error(
 			"Initial connection failed, retrying in background",
 			slog.Any("error", err))
-		self.runner.NotifyError(ctx, self.accountConfig(),
-			"Initial connection failed, retrying in background", err)
+		self.runner.NotifyState(ctx, self.accountConfig(),
+			"Initial connection failed, retrying in background", err.Error())
 		return nil
 	}
 	return nil
@@ -311,8 +311,8 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 				l.Error("Reconnection failed",
 					slog.Duration("backoff", backoff),
 					slog.Any("error", err))
-				self.runner.NotifyError(ctx, self.accountConfig(),
-					"Reconnection failed", err)
+				self.runner.NotifyState(ctx, self.accountConfig(),
+					"Reconnection failed", err.Error())
 				return false
 			}
 
@@ -326,7 +326,7 @@ func (self *WatchMailboxes) reconnect(ctx context.Context) bool {
 		l.Info("Reconnected successfully",
 			slog.Duration("backoff", backoff),
 			slog.String("eventSource", self.eventSource))
-		self.runner.NotifyOK(ctx, self.accountConfig(), "Reconnected successfully",
+		self.runner.NotifyState(ctx, self.accountConfig(), "Reconnected successfully",
 			"Last backoff "+backoff.String())
 		return true
 	}
@@ -402,8 +402,8 @@ func (self *WatchMailboxes) stateChanges(ctx context.Context,
 		l.Error("unable build event source request",
 			slog.String("url", self.eventSource),
 			slog.Any("error", err))
-		self.runner.NotifyError(ctx, self.accountConfig(),
-			"Unable build event source request", err)
+		self.runner.NotifyState(ctx, self.accountConfig(),
+			"Unable build event source request", err.Error())
 		return 0, false
 	}
 
@@ -415,8 +415,8 @@ func (self *WatchMailboxes) stateChanges(ctx context.Context,
 				slog.Any("error", err))
 
 			if backoff == self.backoff && !errors.Is(err, context.Canceled) {
-				self.runner.NotifyError(ctx, self.accountConfig(),
-					"Unable read even source, reconnect", err)
+				self.runner.NotifyState(ctx, self.accountConfig(),
+					"Unable read even source, reconnect", err.Error())
 			}
 
 			if !timeAfter(ctx, backoff) {
@@ -431,7 +431,7 @@ func (self *WatchMailboxes) stateChanges(ctx context.Context,
 			connected = true
 			if backoff > self.backoff {
 				l.Info("Reconnected successfully", slog.Duration("backoff", backoff))
-				self.runner.NotifyOK(ctx, self.accountConfig(),
+				self.runner.NotifyState(ctx, self.accountConfig(),
 					"Reconnected successfully", "Last backoff "+backoff.String())
 			}
 			backoff = self.backoff
@@ -449,7 +449,7 @@ func (self *WatchMailboxes) stateChanges(ctx context.Context,
 
 	if self.closed {
 		l.Error("server closed event source, shutting down")
-		self.runner.NotifyOK(ctx, self.accountConfig(),
+		self.runner.NotifyState(ctx, self.accountConfig(),
 			"Stop watching mailbox(es)", "Server closed even source.")
 		return 0, false
 	}
