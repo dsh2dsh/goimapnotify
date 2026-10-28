@@ -101,7 +101,7 @@ func (self *Runner) NotifyNewMails(ctx context.Context, b *model.Box,
 		if err != nil {
 			return err
 		}
-		if err := n.Send(ctx); err != nil {
+		if _, err := n.Send(ctx); err != nil {
 			return err
 		}
 	}
@@ -125,7 +125,7 @@ func (self *Runner) NotifyError(ctx context.Context,
 		return
 	}
 
-	if err := n.Send(ctx); err != nil {
+	if _, err := n.Send(ctx); err != nil {
 		l.Error("unable notify error state", slog.Any("error", err))
 	}
 }
@@ -146,16 +146,16 @@ func (self *Runner) NotifyOK(ctx context.Context,
 		return
 	}
 
-	if err := n.Send(ctx); err != nil {
+	if _, err := n.Send(ctx); err != nil {
 		l.Error("unable notify OK state", slog.Any("error", err))
 	}
 }
 
 func (self *Runner) NotifyUnreadEmails(ctx context.Context, b *model.Box,
 	unreadEmails uint64,
-) error {
+) (sent SentNotification, _ error) {
 	if self.notifier == nil {
-		return nil
+		return sent, nil
 	}
 
 	logging.FromContext(ctx).Debug("notify unread emails",
@@ -163,11 +163,7 @@ func (self *Runner) NotifyUnreadEmails(ctx context.Context, b *model.Box,
 
 	n, err := NewUnreadEmails(self.handlers[b], unreadEmails)
 	if err != nil {
-		return err
+		return sent, err
 	}
-
-	if err := n.Send(ctx); err != nil {
-		return err
-	}
-	return nil
+	return n.Send(ctx)
 }

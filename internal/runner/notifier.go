@@ -209,8 +209,7 @@ func (self *notifier) closeNotifications(expired []uint32) {
 			return
 		}
 
-		_, err := self.notifier.CloseNotification(id)
-		if err != nil {
+		if err := self.CloseNotification(id); err != nil {
 			slog.Error("unable close desktop notification",
 				slog.Int("expired", len(expired)),
 				slog.Int("index", i),
@@ -219,6 +218,13 @@ func (self *notifier) closeNotifications(expired []uint32) {
 			return
 		}
 	}
+}
+
+func (self *notifier) CloseNotification(id uint32) error {
+	if _, err := self.notifier.CloseNotification(id); err != nil {
+		return fmt.Errorf("close notification id=%v: %w", id, err)
+	}
+	return nil
 }
 
 func (self *notifier) notificationClosed(sig *notify.NotificationClosedSignal) {
@@ -266,9 +272,9 @@ func (self *notifier) Close() {
 }
 
 func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
-) error {
+) (uint32, error) {
 	if self.notifier == nil {
-		return errors.New("not connected to notifier")
+		return 0, errors.New("not connected to notifier")
 	}
 
 	merged := self.notification
@@ -278,13 +284,13 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 
 	id, err := self.notifier.SendNotification(merged)
 	if err != nil {
-		return err //nolint:wrapcheck // caller handles it
+		return 0, err //nolint:wrapcheck // caller handles it
 	}
 
 	if len(n.Actions) == 0 {
 		l.Info("sent desktop notification without actions",
 			slog.Uint64("id", uint64(id)))
-		return nil
+		return id, nil
 	}
 
 	var watching int
@@ -297,7 +303,7 @@ func (self *notifier) Send(n notify.Notification, h *handler, l *slog.Logger,
 		slog.Uint64("id", uint64(id)),
 		slog.Int("watching", watching),
 		slog.Int64("running", self.running.Load()))
-	return nil
+	return id, nil
 }
 
 func (self *notifier) renderNewMail(b *model.Box, thread model.Thread,

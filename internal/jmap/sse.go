@@ -86,7 +86,8 @@ func (self *WatchMailboxes) readEvents(ctx context.Context, r io.Reader,
 	}
 
 	if b.Len() != 0 {
-		yield(nil, fmt.Errorf("read event: %w", io.ErrUnexpectedEOF))
+		yield(nil, fmt.Errorf("read event: %d bytes left: %w", b.Len(),
+			io.ErrUnexpectedEOF))
 	}
 }
 
@@ -117,11 +118,16 @@ func (self *WatchMailboxes) dispatchEvent(ctx context.Context, eventType string,
 	defer b.Reset()
 
 	switch eventType {
+	case "close":
+		self.processCloseEvent(ctx, b.Bytes())
+		return false
 	case "ping":
 		self.processPing(ctx, b.Bytes())
 		return true
 	case "state":
 	default:
+		logging.FromContext(ctx).Debug("unexpected SSE event type",
+			slog.String("event", eventType))
 		return true
 	}
 
@@ -180,4 +186,10 @@ func (self *WatchMailboxes) processRetryField(ctx context.Context, val string) {
 	self.retryDelay = time.Duration(ms) * time.Millisecond
 	logging.FromContext(ctx).Info("got retry event",
 		slog.Duration("retryDelay", self.retryDelay))
+}
+
+func (self *WatchMailboxes) processCloseEvent(ctx context.Context, b []byte) {
+	logging.FromContext(ctx).Info("got close event",
+		slog.String("data", string(bytes.TrimSpace(b))))
+	self.closed = true
 }

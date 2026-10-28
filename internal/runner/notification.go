@@ -12,6 +12,7 @@ import (
 )
 
 type Notification struct {
+	notifier     *notifier
 	handler      *handler
 	notification notify.Notification
 }
@@ -43,25 +44,39 @@ func NewErrorNotification(n *notifier, accountConfig *config.NotifyConfig,
 	if err != nil {
 		return nil, err
 	}
-	return &Notification{notification: notification}, nil
+	return &Notification{notifier: n, notification: notification}, nil
 }
 
-func (self *Notification) Send(ctx context.Context) error {
+func (self *Notification) Send(ctx context.Context) (s SentNotification,
+	_ error,
+) {
 	n := self.notification
 	if n.Summary == "" && n.Body == "" {
-		return nil
+		return s, nil
 	}
 
 	l := logging.FromContext(ctx)
 	l.Debug("send desktop notification")
 
-	err := self.notifier().Send(n, self.handler, l)
+	id, err := self.handlerNotifier().Send(n, self.handler, l)
 	if err != nil {
-		return fmt.Errorf("send desktop notification: %w", err)
+		return s, fmt.Errorf("send desktop notification: %w", err)
 	}
-	return nil
+	return SentNotification{id, self.handler}, nil
 }
 
-func (self *Notification) notifier() *notifier {
-	return self.handler.Notifier()
+func (self *Notification) handlerNotifier() *notifier {
+	if self.handler != nil {
+		return self.handler.Notifier()
+	}
+	return self.notifier
+}
+
+type SentNotification struct {
+	id      uint32
+	handler *handler
+}
+
+func (self *SentNotification) Close() error {
+	return self.handler.Notifier().CloseNotification(self.id)
 }

@@ -172,7 +172,7 @@ func (self *handler) notify(output []byte) {
 		slog.String("mailbox", self.box.Mailbox))
 	l.Debug("send desktop notification")
 
-	if err := self.notifier.Send(n, self, l); err != nil {
+	if _, err := self.notifier.Send(n, self, l); err != nil {
 		printCommandOutput(slog.LevelInfo, "stdout: ", output)
 		l.Error("unable send desktop notification", slog.Any("error", err))
 	}

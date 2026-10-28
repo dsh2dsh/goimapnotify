@@ -11,6 +11,7 @@ import (
 	"git.sr.ht/~rockorager/go-jmap/mail/mailbox"
 
 	"github.com/dsh2dsh/goimapnotify/internal/model"
+	"github.com/dsh2dsh/goimapnotify/internal/runner"
 )
 
 type Mailbox struct {
@@ -19,6 +20,17 @@ type Mailbox struct {
 	path     string
 	children []*Mailbox
 	watching *model.Box
+
+	sentUnread *runner.SentNotification
+}
+
+func (self *Mailbox) WithSentUnread(n *runner.SentNotification) *Mailbox {
+	self.sentUnread = n
+	return self
+}
+
+func (self *Mailbox) SentUnread() *runner.SentNotification {
+	return self.sentUnread
 }
 
 func (self *Mailbox) Path() string { return self.path }

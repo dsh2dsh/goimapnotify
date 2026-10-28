@@ -2,6 +2,7 @@ package jmap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"iter"
 	"log/slog"
@@ -43,6 +44,7 @@ type WatchMailboxes struct {
 	eventSource string
 	lastEventId string
 	retryDelay  time.Duration
+	closed      bool
 
 	pingInterval   int
 	watchdogTicker *time.Ticker
@@ -366,10 +368,11 @@ func (self *WatchMailboxes) notifyUnread(ctx context.Context) {
 			continue
 		}
 
-		err := self.runner.NotifyUnreadEmails(ctx, b, m.UnreadEmails)
+		sent, err := self.runner.NotifyUnreadEmails(ctx, b, m.UnreadEmails)
 		if err != nil {
 			l.Error("unable notify unread emails", slog.Any("error", err))
 		}
+		m.WithSentUnread(&sent)
 	}
 }
 
@@ -411,7 +414,7 @@ func (self *WatchMailboxes) stateChanges(ctx context.Context,
 				slog.Duration("retrying", backoff),
 				slog.Any("error", err))
 
-			if backoff == self.backoff {
+			if backoff == self.backoff && !errors.Is(err, context.Canceled) {
 				self.runner.NotifyError(ctx, self.accountConfig(),
 					"Unable read even source, reconnect", err)
 			}
@@ -441,6 +444,13 @@ func (self *WatchMailboxes) stateChanges(ctx context.Context,
 
 	if ctx.Err() != nil {
 		l.Info("event source cancelled, shutting down")
+		return 0, false
+	}
+
+	if self.closed {
+		l.Error("server closed event source, shutting down")
+		self.runner.NotifyOK(ctx, self.accountConfig(),
+			"Stop watching mailbox(es)", "Server closed even source.")
 		return 0, false
 	}
 
@@ -481,7 +491,8 @@ func (self *WatchMailboxes) listen(req *http.Request,
 
 		ctx := req.Context()
 		logging.FromContext(ctx).Info("listen for events from event source",
-			slog.String("url", self.eventSource))
+			slog.String("url", self.eventSource),
+			slog.String("contentType", resp.Header.Get("Content-Type")))
 		self.readEvents(ctx, resp.Body, yield)
 	}
 }
@@ -750,11 +761,20 @@ func (self *WatchMailboxes) notifyNewMails(ctx context.Context,
 		}
 
 		l := logging.FromContext(ctx).With(slog.String("mailbox", mb.Path()))
+		if sent := mb.SentUnread(); sent != nil {
+			l.Debug("close unread emails notification")
+			mb.WithSentUnread(nil)
+			if err := sent.Close(); err != nil {
+				l.Error("unable close notification about unread emails",
+					slog.Any("error", err))
+			}
+		}
+
 		ctx := logging.WithLogger(ctx, l)
 		mailboxThreads := slices.AppendSeq(make([]model.Thread, 0, len(t)),
 			maps.Values(t))
-
-		err := self.runner.NotifyNewMails(ctx, b, mailboxThreads)
+		err := self.runner.NotifyNewMails(ctx, b,
+			mailboxThreads)
 		if err != nil {
 			l.Error("unable notify new mail", slog.Any("error", err))
 			return
