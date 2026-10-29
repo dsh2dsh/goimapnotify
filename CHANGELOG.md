@@ -2,6 +2,30 @@
 ## [Unreleased]
 
 
+<a name="2.6"></a>
+## [2.6] - 2026-10-27
+### Changes
+- Change return value of probeAll
+- Increase connectivity hosts count to 6
+
+### Features
+- Allow users of legacy configuration format to adjust connectivity probe options
+
+### Fixes
+- Use switch-case instead of if/else-if
+- Declare variable under var section in main
+- Change cpanel.net port to 443
+
+
+<a name="2.5.9"></a>
+## [2.5.9] - 2026-10-08
+### Features
+- Activate Radicle CI for this repository
+
+### Fixes
+- Report new mail after messages are removed from the mailbox
+
+
 <a name="2.5.8"></a>
 ## [2.5.8] - 2026-08-18
 ### Fixes
@@ -178,7 +202,9 @@
 - Resolve "Improve/re-do changelog"
 
 
-[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.5.8...HEAD
+[Unreleased]: https://gitlab.com/shackra/goimapnotify/compare/2.6...HEAD
+[2.6]: https://gitlab.com/shackra/goimapnotify/compare/2.5.9...2.6
+[2.5.9]: https://gitlab.com/shackra/goimapnotify/compare/2.5.8...2.5.9
 [2.5.8]: https://gitlab.com/shackra/goimapnotify/compare/2.5.7...2.5.8
 [2.5.7]: https://gitlab.com/shackra/goimapnotify/compare/2.5.6...2.5.7
 [2.5.6]: https://gitlab.com/shackra/goimapnotify/compare/2.5.5...2.5.6
