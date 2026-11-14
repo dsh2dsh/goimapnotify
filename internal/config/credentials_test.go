@@ -90,7 +90,7 @@ host:			"static.example.com"`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var result NotifyConfig
-			require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &result))
+			require.NoError(t, yaml.Load([]byte(tt.yaml), &result))
 			result.RetrieveCmd()
 
 			assert.Equal(t, tt.wantPassword, result.Password,

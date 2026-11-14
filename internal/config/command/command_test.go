@@ -63,7 +63,7 @@ func TestTemplated(t *testing.T) {
 				OnNewMail *Templated `yaml:"onNewMail"`
 			}{}
 
-			require.NoError(t, yaml.Unmarshal([]byte(tt.yaml), &c))
+			require.NoError(t, yaml.Load([]byte(tt.yaml), &c))
 			require.NotNil(t, c.OnNewMail)
 			assert.Equal(t, tt.str, c.OnNewMail.String())
 			assert.Equal(t, tt.shell, c.OnNewMail.shell)

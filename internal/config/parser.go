@@ -42,13 +42,13 @@ func LoadBytes(b []byte) (*Configuration, error) {
 			},
 		},
 	}
-	if err := yaml.Unmarshal(b, cfg); err != nil {
+	if err := yaml.Load(b, cfg); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
 
 	if cfg.Configurations == nil {
 		var legacy ConfigurationLegacy
-		if err := yaml.Unmarshal(b, &legacy); err != nil {
+		if err := yaml.Load(b, &legacy); err != nil {
 			return nil, fmt.Errorf("parse yaml in 'legacy' format: %w", err)
 		}
 		slog.Info("legacy format configuration detected")
